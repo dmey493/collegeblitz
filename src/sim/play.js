@@ -480,8 +480,11 @@ export class Play {
         o[s].job = P.screen ? 'screenBlock' : 'passBlock';
         o[s].jd = { anchor: this.W(this.F(o[s].home).dx, -1.6), side: P.screen || 0 };
       }
+      // the back stays in to pick up a blitz when the defense sends more than the line can block
+      const rushers = DEF_SLOTS.filter((sl) => this.defPlay.a[sl].t === 'rush').length;
+      const rbStays = rushers > 3 && !P.screen && P.routes.RB && Math.abs(this.F(o.RB.home).dx) < 4;
       for (const s of ['WR1', 'WR2', 'RB']) {
-        if (P.routes[s]) {
+        if (P.routes[s] && !(s === 'RB' && rbStays)) {
           o[s].job = 'route';
           o[s].route = this.routeFrom(o[s], P.routes[s]);
         } else {
@@ -1505,7 +1508,7 @@ export class Play {
       if (!protect) return Infinity;
       const dz = this.F(d).dz;
       if (dz > 9) return Infinity;
-      if (d.job !== 'rush' && dist(d, protect) > 7) return Infinity;
+      if (d.job !== 'rush' && d.job !== 'pursue' && dist(d, protect) > 3.5) return Infinity;
       return dist(d, protect) + dist(b, d) * 0.8;
     }
     if (job === 'runBlock') {
@@ -1541,6 +1544,11 @@ export class Play {
     if (!(d.state === 'stand' || d.state === 'engaged' || d.state === 'stumble')) return false;
     if ((d.immune[o.id] || 0) > this.t) return false;
     if (d.engBy.length >= 2) return false;
+    // don't get sucked into a double team on the way to your own man
+    if (d.engBy.length && this.blockTargets.get(o.id) !== d) return false;
+    // pass protectors only take on people actually coming after the passer
+    const pro = o.job === 'passBlock' || o.job === 'screenBlock' || o.job === 'drawBlock' || o.job === 'puntBlock' || o.job === 'fgBlock';
+    if (pro && d.job !== 'rush' && d.job !== 'pursue' && this.blockTargets.get(o.id) !== d) return false;
     if (this.ball.state === 'air' && this.ball.f && this.ball.f.kind === 'pass' && d.job === 'ballHawk') return false;
     o.eng = d;
     o.setState('engaged');

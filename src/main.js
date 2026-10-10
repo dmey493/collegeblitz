@@ -204,7 +204,8 @@ class App {
       else if (this.lobbyScr) this.lobbyScr.setLobby({ ...(this.lobbyLast || {}), players: [{ name: this.settings.name, ready: false }] });
     });
     s.on('close', () => {
-      if (this.session !== s) return;
+      // a failed connect already showed its own error message
+      if (this.session !== s || !s.opened) return;
       if (this.mode === 'game') this.hud.callout('DISCONNECTED', 'CONNECTION TO SERVER LOST', 'red', 4);
       else {
         this.showOnline();

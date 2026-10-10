@@ -304,12 +304,15 @@ function passBlock(play, p) {
     uz /= ul;
     let tx = t.x + ux * 0.9;
     let tz = t.z + uz * 0.9;
+    // hold the pocket: never chase past the line, never drift far from home
+    const maxZ = play.losZ - play.dir * 0.6;
+    if (play.dir * (tz - maxZ) > 0) tz = maxZ;
     const ax = tx - anchor.x;
     const az = tz - anchor.z;
     const al = len(ax, az);
-    if (al > 3.5) {
-      tx = anchor.x + (ax / al) * 3.5;
-      tz = anchor.z + (az / al) * 3.5;
+    if (al > 2.6) {
+      tx = anchor.x + (ax / al) * 2.6;
+      tz = anchor.z + (az / al) * 2.6;
     }
     seek(p, tx, tz, 0.25);
   } else seek(p, anchor.x, anchor.z, 0.8, 0.6);
@@ -460,6 +463,11 @@ function rush(play, p) {
   if (readRun(play, p) && b.carrier && b.carrier.slot !== 'QB') {
     p.job = 'pursue';
     return pursue(play, p);
+  }
+  // linebackers and safeties time their blitz a beat after the snap
+  if ((p.pos === 'LB' || p.pos === 'S' || p.pos === 'CB') && play.kind === 'scrimmage' && play.liveT < (p.jd.delay ??= 0.18 + play.rng() * 0.2)) {
+    stop(p);
+    return;
   }
   let tx = t.x;
   let tz = t.z;

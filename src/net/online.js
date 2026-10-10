@@ -29,11 +29,15 @@ export class OnlineSession {
     this.lastArrive = 0;
     this.closed = false;
     this.ws = new WebSocket(url);
-    this.ws.onopen = () => this.emit('open');
+    this.opened = false;
+    this.ws.onopen = () => {
+      this.opened = true;
+      this.emit('open');
+    };
     this.ws.onclose = () => {
       if (!this.closed) this.emit('close');
     };
-    this.ws.onerror = () => this.emit('error', 'Could not reach the game server.');
+    this.ws.onerror = () => this.emit('error', `Could not reach a game server at ${url}. Online play needs the College Blitz server running (npm start).`);
     this.ws.onmessage = (m) => this.onMessage(m.data);
   }
 
