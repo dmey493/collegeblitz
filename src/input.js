@@ -66,8 +66,14 @@ export class Input {
   }
 
   pads() {
-    if (!navigator.getGamepads) return [];
-    return Array.from(navigator.getGamepads()).filter(Boolean);
+    if (!navigator.getGamepads || this.noPads) return [];
+    try {
+      return Array.from(navigator.getGamepads()).filter(Boolean);
+    } catch {
+      // gamepads can be blocked inside sandboxed frames
+      this.noPads = true;
+      return [];
+    }
   }
 
   // Called once per frame. Returns the game input for local player 1.

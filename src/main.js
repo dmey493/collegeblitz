@@ -455,14 +455,21 @@ class App {
   }
 
   tick(dt, skipDraw) {
-    const inp = this.input.poll(dt);
+    let inp = { mx: 0, my: 0, turbo: false, a: this.input.a, j: this.input.j };
+    try {
+      inp = this.input.poll(dt);
+    } catch (err) {
+      console.error(err);
+    }
     const evts = this.input.takeMenu();
     try {
       if (this.mode === 'game' && this.session) {
-        for (const e of evts) {
-          if (e === 'pause' && !(this.screen && this.paused && this.screen.el.classList.contains('howto'))) {
-            if (this.paused) this.closePause();
-            else this.openPause();
+        // Esc reports both 'back' and 'pause'; treat it as one press
+        const list = evts.includes('pause') ? evts.filter((e) => e !== 'back') : evts;
+        for (const e of list) {
+          if (e === 'pause') {
+            if (!this.paused) this.openPause();
+            else if (this.screen) this.screen.handle('back');
             continue;
           }
           if (this.paused && this.screen) this.screen.handle(e);
@@ -480,7 +487,8 @@ class App {
         }
         this.renderer.render(view, this.paused && this.session && this.session.kind === 'local' ? 0 : dt, { mode: 'game', skipDraw });
       } else {
-        for (const e of evts) if (this.screen) this.screen.handle(e);
+        const list = evts.includes('pause') ? evts.filter((e) => e !== 'pause') : evts;
+        for (const e of list) if (this.screen) this.screen.handle(e);
         if (this.session && this.session.update) this.session.update(dt, inp);
         this.renderer.render(null, dt, { mode: 'title', skipDraw });
       }
@@ -490,7 +498,7 @@ class App {
   }
 }
 
-window.addEventListener('DOMContentLoaded', async () => {
+async function boot() {
   // canvas textures need the display font loaded first
   try {
     await Promise.race([
@@ -501,4 +509,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     /* fall back to system fonts */
   }
   window.app = new App();
-});
+}
+
+if (document.readyState === 'loading') window.addEventListener('DOMContentLoaded', boot);
+else boot();

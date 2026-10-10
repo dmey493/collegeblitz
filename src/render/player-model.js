@@ -107,10 +107,12 @@ export class PlayerModel {
     this.tilt.add(this.hips);
     const skin = S.skin[(id * 7 + num) % S.skin.length];
 
+    // only the big shapes cast shadows: keeps the shadow pass cheap
+    const casters = new Set([S.torso, S.pads, S.helmet, S.thigh, S.shin, S.pelvis]);
     const mesh = (geo, mat, parent, x = 0, y = 0, z = 0) => {
       const m = new THREE.Mesh(geo, mat);
       m.position.set(x, y, z);
-      m.castShadow = true;
+      m.castShadow = casters.has(geo);
       parent.add(m);
       return m;
     };

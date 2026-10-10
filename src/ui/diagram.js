@@ -2,7 +2,8 @@
 import { FORMATIONS, OL_SPOTS, DEF_BASE_ALIGN } from '../sim/playbook.js';
 
 const X = (dx) => 50 + dx * 2.45;
-const Y = (dz) => 50 - dz * 1.22;
+let yScale = 1.22;
+const Y = (dz) => 50 - dz * yScale;
 const clampY = (y) => Math.max(4, Math.min(63, y));
 const clampX = (x) => Math.max(4, Math.min(96, x));
 
@@ -41,12 +42,13 @@ const cross = (dx, dz, color) => {
 function frame(inner) {
   return `<svg viewBox="0 0 100 66" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
   <rect x="0" y="0" width="100" height="66" rx="3" fill="#1f5c1a"/>
-  <g stroke="rgba(255,255,255,0.13)" stroke-width="0.5">${[0, 1, 2, 3, 4].map((i) => `<line x1="0" x2="100" y1="${(50 - i * 10 * 1.22).toFixed(1)}" y2="${(50 - i * 10 * 1.22).toFixed(1)}"/>`).join('')}</g>
+  <g stroke="rgba(255,255,255,0.13)" stroke-width="0.5">${[0, 1, 2, 3, 4].map((i) => `<line x1="0" x2="100" y1="${Y(i * 10).toFixed(1)}" y2="${Y(i * 10).toFixed(1)}"/>`).join('')}</g>
   <line x1="0" x2="100" y1="50" y2="50" stroke="#3d8bff" stroke-width="0.9" opacity="0.9"/>
   ${inner}</svg>`;
 }
 
 export function offenseDiagram(play, color = '#ffd23f') {
+  yScale = 1.22;
   if (play.special) {
     const label = play.id === 'punt' ? 'PUNT' : 'FIELD GOAL';
     const f = FORMATIONS[play.form];
@@ -77,6 +79,7 @@ export function offenseDiagram(play, color = '#ffd23f') {
 }
 
 export function defenseDiagram(play) {
+  yScale = 1.6;
   const f = FORMATIONS.gun;
   let s = '';
   for (const k of ['C', 'LG', 'RG']) s += square(OL_SPOTS[k][0], OL_SPOTS[k][1], 'rgba(233,237,243,0.45)');

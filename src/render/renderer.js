@@ -357,7 +357,8 @@ export class GameRenderer {
     for (const t of [0, 1]) {
       const g = M.ctrl[t];
       const id = pl ? pl.ctl[t] : -1;
-      const showRing = pl && id >= 0 && ctx.mode !== 'title' && view.local && view.local[t] && pl.ph !== 'dead';
+      const human = !!(pl && view && view.snap && (view.snap.hu ? view.snap.hu[t] : view.local && view.local[t]));
+      const showRing = pl && id >= 0 && ctx.mode !== 'title' && human && pl.ph !== 'dead';
       g.visible = !!showRing;
       if (showRing) {
         const p = view.byId.get(id);
