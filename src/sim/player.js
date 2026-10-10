@@ -105,3 +105,7 @@ export class Player {
     this.stDur = dur;
   }
 }
+
+export function bodyOfSlot(slot) {
+  return BASE[POS_OF_SLOT[slot]].body;
+}

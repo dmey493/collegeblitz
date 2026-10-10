@@ -277,7 +277,7 @@ export class Match {
     const fd = this.rules.fdYards;
 
     if (kind === 'pat') {
-      if (res.good) this.addScore(off, 1);
+      if (res.good && !res.scored) this.addScore(off, 1);
       this.emit({ k: 'conv', team: off, good: !!res.good, two: false });
       return this.afterScore(off);
     }
@@ -290,7 +290,7 @@ export class Match {
       return this.afterScore(off);
     }
     if (res.type === 'td') {
-      this.addScore(res.team, 6);
+      if (!res.scored) this.addScore(res.team, 6);
       this.stats[res.team].tds++;
       return this.startPatChoice(res.team);
     }
@@ -306,7 +306,7 @@ export class Match {
       this.stats[off].fgAtt++;
       if (res.good) {
         this.stats[off].fgMade++;
-        this.addScore(off, 3);
+        if (!res.scored) this.addScore(off, 3);
         return this.afterScore(off);
       }
       if (this.ot) return this.endOTPossession();
@@ -592,9 +592,9 @@ export class Match {
           q.state, round2(q.st), (q.turboOn ? 1 : 0) | (q.fallFwd ? 2 : 0),
         ]),
         B: [round2(b.x), round2(b.y), round2(b.z), b.state, b.carrier ? b.carrier.id : -1, b.f ? b.f.kind : ''],
-        res: p.result ? { type: p.result.type, team: p.result.team, good: p.result.good } : null,
+        res: p.result ? { type: p.result.type, team: p.result.team, good: p.result.good, id: p.scorer ? p.scorer.id : -1 } : null,
       };
-      if (b.f && b.f.kind === 'pass') s.pl.F = [round2(b.f.tx), round2(b.f.tz), b.f.intended ? b.f.intended.id : -1];
+      if (b.f) s.pl.F = [round2(b.f.fx), round2(b.f.fz), round2(b.f.tx), round2(b.f.tz), b.f.intended ? b.f.intended.id : -1, b.f.kind];
     }
     return s;
   }

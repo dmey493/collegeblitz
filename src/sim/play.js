@@ -1142,6 +1142,10 @@ export class Play {
           f.resolved = true;
           this.emit({ k: f.good ? 'fgGood' : 'fgMiss', kind: this.kind });
           this.whistle(this.kind === 'pat' ? 'pat' : 'fg', { good: f.good });
+          if (f.good) {
+            this.m.addScore(this.off, this.kind === 'pat' ? 1 : 3);
+            this.result.scored = true;
+          }
         }
         if (b.y <= 0.15 && s > 1) this.restBall();
         return;
@@ -1975,6 +1979,11 @@ export class Play {
     this.scorer = c;
     this.whistle('td', { team: c.team, spotZ: c.z });
     this.deadDur = 3.4;
+    // put it on the board right away (conversions settle after the play)
+    if (this.kind === 'scrimmage') {
+      this.m.addScore(c.team, 6);
+      this.result.scored = true;
+    }
   }
 
   whistle(type, data = {}) {
