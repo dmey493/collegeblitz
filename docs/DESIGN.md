@@ -1,4 +1,4 @@
-# College Blitz — Design Notes (Mockup v0.2)
+# College Blitz — Design Notes (Mockup v0.3)
 
 Working title taken from the repo name. Goal: a PC arcade college-football game that
 plays and *looks* like the early-2000s console arcade football games (GameCube era),
@@ -58,20 +58,42 @@ answers to any key. The classic *aim + pass* style (steer toward a receiver, pre
 setting. A press made while the snap is still in the air is held until the QB has the ball.
 
 Context moves: ball carrier **Spin = spin move**, **Pass = stiff-arm**, **Jump = hurdle**.
-Receiver: **Jump** to go up for the ball, **Spin = diving catch** (paced to meet the ball;
-down where you land). Defender: **Spin = dive tackle**, **Jump = leap for the ball**,
-**Pass = switch to the man nearest the ball**. With nobody steering, the human QB takes his
-drop automatically.
+Receiver: **Jump** to go up for the ball (with a pass in the air the leap is sized so its top
+meets the ball), **Spin = diving catch** (paced to meet the ball; down where you land).
+Defender: **Spin = flying tackle** (homes in on a runner ahead of you, up to ~5 yards out),
+**Jump = leap for the ball**, **Pass = switch to the man nearest the ball**. With nobody
+steering, the human QB takes his drop automatically.
+
+### Movement ("move like the arcade game")
+
+* Players hang in the air longer than the ball does (their own gravity): a full leap goes about
+  1.15 yards up with 0.8 s of hang time and keeps the run-up's momentum (little air steering).
+* CPU receivers look ahead for a leap whose apex meets the ball and take nearly every high or
+  contested one; lobs and throws into coverage are put up high so they have to. Defenders go up
+  to contest. A receiver who is a step short lays out for it. A receiver hit in the air gets
+  blown up.
+* Dives are flying tackles: launched at where the runner will be, about 0.44 s flat out in the
+  air, then a belly slide. A miss costs the diver ~1.5 s on the ground; a runner can still
+  break a diving arm tackle, spin out of it or hurdle it.
+* Animation runs on stride length (long, powerful strides at speed, heel kick, pumping arms),
+  blends in backpedals and side shuffles from the body-relative velocity, leans into cuts, and
+  has dedicated leap, layout, flying-tackle, big-hit tumble, fall and get-up motions.
+* The camera rides a pass out, moves in tight on the catch and stays tight on the runner; after
+  a turnover or on a return it swings around behind the new ball carrier.
 
 ## 4. Art direction ("GameCube night game")
 
 * Night stadium under 4 light towers; saturated turf with mowing stripes, crisp white paint,
   team-colored end zones with the state names, midfield state silhouette.
-* Bulky, larger-than-life players: one skinned mesh each with giant domed shoulder pads, a barrel
-  chest that V-tapers to a narrow waist, thick arms and comparatively slim legs. Uniform texture
-  atlas per player (wrap-around numbers, shoulder TV numbers, sleeve stripes, belt, pants
-  stripes, striped socks, taped ankles); clear-coated helmets with stripe and state decal, cage
-  masks for linemen, two-bar masks for skill players, optional visors.
+* Bulky, larger-than-life players built to the proportions of the early-2000s arcade models:
+  long legs and a small helmet sunk between wide, flat-topped shoulder pads (part of the torso,
+  the jersey stretched over them), a deep chest that V-tapers to the belt, big arms with huge
+  forearms and painted muscle, gloves with fingers, tight pants over thigh and knee pads,
+  ribbed socks over taped ankles, high-top studded cleats and a face inside the helmet. One
+  skinned mesh each (17 bones, ~14k triangles). Uniform texture atlas per player (block
+  numbers with an outline and drop shadow, mesh knit, sleeve stripes and ribbed cuffs, belt,
+  pants stripes, laces); clear-coated helmets with stripe and state decal, cage masks for
+  linemen, two-bar masks for skill players, optional visors.
 * Grit over gloss: hard night lighting with stadium-light glints in the helmets, a film finish
   (grain, vignette, contrast grade, bloom on real highlights only), chewed-up turf with dirt down
   the hashes, and uniforms that pick up grass stains, mesh-knit relief, wrinkles and cracked

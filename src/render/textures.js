@@ -527,24 +527,32 @@ function rrect(g, x, y, w, h, r) {
   g.roundRect(x, y, w, h, r);
 }
 
-// Height map (gray canvas) -> tangent-space normal map texture.
+// Height map (gray canvas) -> tangent-space normal map texture. The canvas should be made
+// with willReadFrequently so reading it back stays on the CPU.
 function heightToNormals(c, k = 2.2) {
   const S = c.width;
   const T = c.height;
-  const g = c.getContext('2d');
+  const g = c.getContext('2d', { willReadFrequently: true });
   const src = g.getImageData(0, 0, S, T).data;
+  const H = new Float32Array(S * T);
+  for (let i = 0; i < S * T; i++) H[i] = src[i * 4] / 255;
   const out = g.createImageData(S, T);
-  const H = (x, y) => src[((Math.min(T - 1, Math.max(0, y)) * S) + Math.min(S - 1, Math.max(0, x))) * 4] / 255;
+  const d = out.data;
   for (let y = 0; y < T; y++) {
+    const up = (y > 0 ? y - 1 : 0) * S;
+    const dn = (y < T - 1 ? y + 1 : T - 1) * S;
+    const row = y * S;
     for (let x = 0; x < S; x++) {
-      const du = (H(x + 1, y) - H(x - 1, y)) * k;
-      const dv = -(H(x, y + 1) - H(x, y - 1)) * k;
-      const l = Math.hypot(du, dv, 1);
-      const o = (y * S + x) * 4;
-      out.data[o] = (-du / l * 0.5 + 0.5) * 255;
-      out.data[o + 1] = (-dv / l * 0.5 + 0.5) * 255;
-      out.data[o + 2] = (1 / l * 0.5 + 0.5) * 255;
-      out.data[o + 3] = 255;
+      const l = x > 0 ? x - 1 : 0;
+      const r = x < S - 1 ? x + 1 : S - 1;
+      const du = (H[row + r] - H[row + l]) * k;
+      const dv = -(H[dn + x] - H[up + x]) * k;
+      const inv = 1 / Math.sqrt(du * du + dv * dv + 1);
+      const o = (row + x) * 4;
+      d[o] = (-du * inv * 0.5 + 0.5) * 255;
+      d[o + 1] = (-dv * inv * 0.5 + 0.5) * 255;
+      d[o + 2] = (inv * 0.5 + 0.5) * 255;
+      d[o + 3] = 255;
     }
   }
   g.putImageData(out, 0, 0);
@@ -557,7 +565,7 @@ let fabricNormals = null;
 export function uniformNormalMap(S = 512) {
   if (fabricNormals) return fabricNormals;
   const c = canvas(S, S);
-  const g = c.getContext('2d');
+  const g = c.getContext('2d', { willReadFrequently: true });
   const r = srand(4242);
   const box = (R) => boxOf(R, S);
   g.fillStyle = 'rgb(128,128,128)';
@@ -587,7 +595,8 @@ export function uniformNormalMap(S = 512) {
     g.restore();
   };
   const knit = canvas(4, 4);
-  const kg = knit.getContext('2d');
+  // a CPU canvas: patterns from a GPU canvas into this one are read back on every use
+  const kg = knit.getContext('2d', { willReadFrequently: true });
   kg.fillStyle = 'rgb(134,134,134)';
   kg.fillRect(0, 0, 4, 4);
   kg.fillStyle = 'rgb(116,116,116)';
@@ -1009,7 +1018,7 @@ export function skinNormalMap() {
   if (skinNormals) return skinNormals;
   const S = 512;
   const c = canvas(S, S);
-  const g = c.getContext('2d');
+  const g = c.getContext('2d', { willReadFrequently: true });
   g.fillStyle = 'rgb(128,128,128)';
   g.fillRect(0, 0, S, S);
   for (const [region, u, v, rx, ry, k] of MUSCLES) {
