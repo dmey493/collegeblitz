@@ -73,6 +73,8 @@ export class Player {
     this.fallFwd = false;
     this.hug = false; // a tackler wrapped up on the man he took down
     this.taunt = false; // celebrating a big hit or a sack
+    this.pileOn = null; // the downed man this one is lying on top of
+    this.pileTried = false; // a CPU defender who has already decided whether to pile on
 
     this.job = 'idle';
     this.jd = {}; // job data

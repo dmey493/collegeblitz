@@ -255,8 +255,9 @@ export class GameRenderer {
           break;
         }
         case 'land':
-          // a diver hits the turf: grass and dirt fly
-          this.effects.turf(e.x, e.z, 12);
+          // a diver hits the turf: grass and dirt fly (landing on the pile: a jolt instead)
+          if (e.pile) this.director.kick(0.12);
+          else this.effects.turf(e.x, e.z, 12);
           break;
         case 'td': {
           const p = view.byId.get(e.id);

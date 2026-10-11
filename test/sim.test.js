@@ -2,6 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Match } from '../src/sim/match.js';
+import { PILE_Y } from '../src/sim/constants.js';
 import { OFF_PLAYS, DEF_PLAYS } from '../src/sim/playbook.js';
 
 function runGame(seed, opts = {}) {
@@ -444,3 +445,33 @@ test('no flags: a dive into the receiver while the pass is in the air flattens h
     assert.ok(!s.rec.upright, 'he goes down');
   }
 });
+
+test('pile-on: CPU defenders dive on top of the tackled man, and the man underneath stays down', () => {
+  const m = new Match({ teams: ['IND', 'MICH'], humans: [false, false], seed: 1 });
+  let checked = 0;
+  for (let i = 0; i < 60 * 60 * 10 && checked < 3; i++) {
+    m.step(1 / 60);
+    const pile = m.drainEvents().find((e) => e.k === 'pile');
+    if (!pile) continue;
+    const play = m.play;
+    const q = play.byId.get(pile.id);
+    let landed = false;
+    while (!play.finished) {
+      m.step(1 / 60);
+      m.drainEvents();
+      if (q.pileOn && q.vy === 0 && (q.state === 'down' || q.state === 'dive')) {
+        landed = true;
+        const base = q.pileOn;
+        assert.ok(base.state === 'down' || base.state === 'dive', 'the man underneath is on the turf');
+        assert.ok(Math.abs(q.y - (base.y + PILE_Y)) < 1e-6, 'lying on top of him');
+        assert.ok(Math.hypot(q.x - base.x, q.z - base.z) < 0.75, 'right on top, not beside him');
+        assert.notEqual(base.state, 'getup', 'nobody gets up with a man on top of him');
+        assert.equal(m.snapshot().pl.P.find((r) => r[0] === q.id)[9] & 16, 16, 'the renderer is told he is on the pile');
+      }
+    }
+    assert.ok(landed, `pile-on ${checked + 1} landed on the pile`);
+    checked++;
+  }
+  assert.equal(checked, 3);
+});
+

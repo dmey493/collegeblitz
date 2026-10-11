@@ -456,7 +456,8 @@ export class PlayerModel {
         // launch, fly flat out (arms out front for the ball, spread wide to wrap up a
         // runner), belly-flop and slide
         const launch = ease(Math.min(1, st / 0.13));
-        const landed = v.y <= 0.002 && st > 0.13;
+        // on the turf, or lying on top of a pile
+        const landed = (v.y <= 0.002 || v.pile) && st > 0.13;
         T.tiltX = 0.5 + 1.02 * launch;
         T.lean = 0.04;
         // eyes up on the target (or the ball), the neck extended

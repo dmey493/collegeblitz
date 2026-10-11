@@ -27,6 +27,9 @@ likeness issues).
 * 7-on-7. Offense: QB, C, 2 G, 2 WR, RB. Defense: 2 DL, 2 LB, 2 CB, S.
 * **4 downs to gain 30 yards** (25 selectable in settings).
 * No penalties. Late hits after the whistle are allowed (the controlled player keeps moving for ~1.5 s).
+  CPU defenders already closing on a tackle pile on (up to two, scaled by the CPU DIVES setting):
+  a hop timed to land on the man on the turf. Any body that comes down on a man already down lies
+  on top of him (`PILE_Y` higher, two deep at most), and nobody gets up with a man on top of him.
 * Ball is always re-spotted in the middle of the field.
 * Passes: one forward pass, from behind the line of scrimmage. Turbo + pass = bullet pass.
 * Scoring: TD 6, FG 3, safety 2. No kicked extra point: after a TD the play-select screen has a free **+1** in the middle (the cursor starts on it, and it is what you get if the timer runs out); the plays around it go for 2 from the 3. From the third overtime every conversion is a 2-point play.

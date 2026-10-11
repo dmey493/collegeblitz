@@ -157,6 +157,9 @@ export class HUD {
         case 'interference':
           this.popup('NO FLAG!', 'hot');
           break;
+        case 'pile':
+          if (e.first) this.popup('PILE ON!', 'hot');
+          break;
         case 'whistle':
           if (e.type === 'touchback') this.callout('TOUCHBACK', '', 'white', 1.4);
           break;

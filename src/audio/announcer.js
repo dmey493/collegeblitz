@@ -18,6 +18,7 @@ export const CALLS = {
   juke: ['Spin move!', 'Look at that move!'],
   grab: ['What a catch!', 'He went up and got it!', 'Unbelievable grab!'],
   layout: ['Diving catch!', 'He laid out for it!'],
+  pile: ['Pile on!'],
 };
 
 // the build inlines each clip as a data: URL

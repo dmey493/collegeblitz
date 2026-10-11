@@ -473,6 +473,16 @@ class App {
         case 'dive':
           A.whoosh(0.7);
           break;
+        case 'land':
+          if (e.pile) A.hit(false);
+          break;
+        case 'pile':
+          if (e.first) {
+            A.ooh();
+            // don't talk over the call for the big hit
+            if (!e.big && Math.random() < 0.4) say('pile');
+          }
+          break;
         case 'jump':
           A.whoosh(1.4);
           break;

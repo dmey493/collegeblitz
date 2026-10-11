@@ -110,7 +110,8 @@ layout under **SETTINGS → CONTROLS** (or on the vs-CPU setup screen).
 - **No flags:** while a pass is in the air you can take the receiver out, any time, like the arcade
   original: Spin to dive into him (it aims at him) or run him over on turbo. He goes down and can't
   catch it. Before the throw, contact just bumps. The CPU will do it to you too.
-- Late hits after the whistle are legal.
+- Late hits after the whistle are legal, and defenders closing on a tackle pile on: they hop onto
+  the man on the turf and stack up (two deep at most).
 
 ## Arcade feel (vs CPU)
 

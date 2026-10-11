@@ -4,7 +4,7 @@
 import {
   HALF_W, GOAL, END, POST_Z, POST_HALF, CROSSBAR, GRAVITY, TURBO_MULT, TURBO_DRAIN, TURBO_REGEN,
   DEF_SLOTS, DIFFICULTY, TEAMMATE_LEVEL, dirOf,
-  AIR_GRAVITY, JUMP_VY, HURDLE_VY, DIVE_VY, DIVE_AIR, DIVE_SLIDE, HIT_GRAVITY, GETUP_TIME, VIEW_TURN,
+  AIR_GRAVITY, JUMP_VY, HURDLE_VY, DIVE_VY, DIVE_AIR, DIVE_SLIDE, HIT_GRAVITY, GETUP_TIME, VIEW_TURN, PILE_Y,
 } from './constants.js';
 import { clamp, lerp, len, dist, turnToward, angleOf, wrapAngle } from './math.js';
 import { Player } from './player.js';
@@ -14,6 +14,8 @@ import { runAI, leapFor } from './ai.js';
 export const BLOCK_JOBS = new Set([
   'passBlock', 'runBlock', 'leadBlock', 'screenBlock', 'drawBlock', 'stalk', 'returnBlock', 'puntBlock', 'fgBlock', 'leadPath',
 ]);
+// flat out on the turf (or on the pile): down, or a dive that has come to earth
+const lying = (q) => q.state === 'down' || (q.state === 'dive' && q.vy === 0);
 const SOLID_STATES = new Set(['stand', 'engaged', 'spin', 'stiff', 'jump', 'hurdle', 'throw', 'catch', 'stumble', 'stance', 'celebrate', 'kneel', 'kick']);
 const TIMED_STATES = new Set(['spin', 'stiff', 'throw', 'catch', 'stumble', 'kick']);
 // How long a press stays live. Receiver-icon presses wait longer so a throw pressed while the
@@ -1012,6 +1014,35 @@ export class Play {
     this.emit({ k: 'dive', id: p.id });
   }
 
+  // Where a falling body comes to rest: on the turf, or on top of a man already down there
+  // (sets p.pileOn). Two deep at most.
+  pileFloor(p) {
+    let base = null;
+    for (const q of this.players) {
+      if (q === p || !lying(q) || q.pileOn === p || q.y > PILE_Y * 1.5) continue;
+      if (len(q.x - p.x, q.z - p.z) > 0.6 || p.y < q.y + PILE_Y - 0.3) continue;
+      if (!base || q.y > base.y) base = q;
+    }
+    p.pileOn = base;
+    return base ? base.y + PILE_Y : 0;
+  }
+
+  // Lying on the pile: stay on top of the man underneath while he is down, slide off if he goes.
+  restOnPile(p, dt) {
+    const base = p.pileOn;
+    if (base && lying(base) && len(base.x - p.x, base.z - p.z) < 0.75) {
+      p.y = base.y + PILE_Y;
+      return;
+    }
+    p.pileOn = null;
+    if (p.y > 0) {
+      // nothing underneath (he slid off, or was put down in mid-air): drop to the turf
+      p.vy = Math.min(p.vy, 0) - HIT_GRAVITY * dt;
+      p.y = Math.max(0, p.y + p.vy * dt);
+    }
+    if (p.y === 0) p.vy = 0;
+  }
+
   knockDown(p, fromX, fromZ, dur = 0.8) {
     const dx = p.x - fromX;
     const dz = p.z - fromZ;
@@ -1883,7 +1914,9 @@ export class Play {
       p.vz *= f;
       p.x += p.vx * dt;
       p.z += p.vz * dt;
-      p.y = 0;
+      this.restOnPile(p, dt);
+      // nobody gets up with a man lying on top of him
+      if (this.players.some((q) => q.pileOn === p && lying(q))) return;
       if (p.st >= p.stDur && this.phase !== 'dead') p.setState('getup', GETUP_TIME);
       else if (p.st >= p.stDur + 0.6) p.setState('getup', GETUP_TIME);
       return;
@@ -1891,6 +1924,8 @@ export class Play {
     if (st === 'getup') {
       p.vx = 0;
       p.vz = 0;
+      p.pileOn = null;
+      if (p.y > 0) p.y = Math.max(0, p.y - 3 * dt); // rolling off the pile
       if (p.st >= p.stDur) p.setState('stand');
       return;
     }
@@ -1899,8 +1934,10 @@ export class Play {
       p.y += p.vy * dt;
       p.x += p.vx * dt;
       p.z += p.vz * dt;
-      if (p.y <= 0 && p.vy < 0) {
-        p.y = 0;
+      const floor = p.vy < 0 ? this.pileFloor(p) : 0;
+      if (p.y <= floor && p.vy < 0) {
+        p.y = floor;
+        p.vy = 0;
         p.vx *= 0.35;
         p.vz *= 0.35;
         p.setState('down', 1.3);
@@ -1908,28 +1945,29 @@ export class Play {
       return;
     }
     if (st === 'dive') {
-      if (p.y > 0 || p.vy > 0) {
+      if (p.vy !== 0 || (p.y > 0 && !p.pileOn)) {
         p.vy -= this.air.g * dt;
         p.y += p.vy * dt;
-        if (p.y <= 0) {
-          // belly-flop into the turf
-          p.y = 0;
+        const floor = p.vy < 0 ? this.pileFloor(p) : 0;
+        if (p.y <= floor) {
+          // belly-flop into the turf, or onto whoever is already down there
+          p.y = floor;
           p.vy = 0;
-          p.vx *= 0.6;
-          p.vz *= 0.6;
-          this.emit({ k: 'land', id: p.id, x: Math.round(p.x * 10) / 10, z: Math.round(p.z * 10) / 10 });
+          p.vx *= p.pileOn ? 0.25 : 0.6;
+          p.vz *= p.pileOn ? 0.25 : 0.6;
+          this.emit({ k: 'land', id: p.id, x: Math.round(p.x * 10) / 10, z: Math.round(p.z * 10) / 10, pile: !!p.pileOn });
         }
       } else {
         const f = Math.max(0, 1 - 6 * dt);
         p.vx *= f;
         p.vz *= f;
+        this.restOnPile(p, dt);
       }
       p.x += p.vx * dt;
       p.z += p.vz * dt;
       if (p.st >= p.stDur) {
         p.fallFwd = true;
-        p.y = 0;
-        p.setState('down', 0.25);
+        p.setState('down', p.pileOn ? 0.6 : 0.25);
       }
       return;
     }
@@ -2308,6 +2346,41 @@ export class Play {
   }
 
   // ------------------------------------------------------------- after the whistle
+  // Blitz pile-on: defenders already closing on the tackle throw themselves on top of the pile.
+  pileOnAI() {
+    const lt = this.lastTackle;
+    const c = lt && this.byId.get(lt.on);
+    if (!c || c.state !== 'down') return;
+    for (const p of this.players) {
+      if (p.team === c.team || p.pileTried || !p.upright || p.state === 'celebrate' || this.isHuman(p)) continue;
+      const d = dist(p, c);
+      if (d < 1.2 || d > 6) continue;
+      const closing = (p.vx * (c.x - p.x) + p.vz * (c.z - p.z)) / d;
+      if (closing < 3) continue;
+      p.pileTried = true;
+      if (this.piled >= 2 || this.rng() > Math.min(0.9, 0.45 * this.diveMul)) continue;
+      this.piled = (this.piled || 0) + 1;
+      p.actCd = 0;
+      // where the man on the turf will stop sliding (his slide dies away at 7/s, see integrate)
+      const tx = c.x + c.vx / 7;
+      const tz = c.z + c.vz / 7;
+      const td = len(tx - p.x, tz - p.z) || 1;
+      this.doDive(p, tx, tz);
+      // a hop up onto the pile (a flying tackle stays low), timed to come down right on top of
+      // him; the second man in goes higher and lands on the first
+      const g = this.air.g;
+      const top = PILE_Y * this.piled;
+      const vy = Math.sqrt(2 * g * (top + 0.4));
+      const t = (vy + Math.sqrt(vy * vy - 2 * g * (top - p.y))) / g;
+      const sp = td / t;
+      p.vx = ((tx - p.x) / td) * sp;
+      p.vz = ((tz - p.z) / td) * sp;
+      p.vy = vy;
+      p.stDur = Math.max(p.stDur, t + 0.15);
+      this.emit({ k: 'pile', id: p.id, on: c.id, first: this.piled === 1, big: !!lt.big });
+    }
+  }
+
   stepDead(dt, inputs) {
     this.deadT += dt;
     this.updateView(dt);
@@ -2354,6 +2427,7 @@ export class Play {
         p.iz = 0;
       }
     }
+    if (res && res.type === 'tackle' && this.deadT < 0.6) this.pileOnAI();
     // late hits by whoever the humans are steering
     for (const team of [0, 1]) {
       if (!this.m.human[team] || this.deadT > 1.6) continue;
