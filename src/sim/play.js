@@ -2108,15 +2108,32 @@ export class Play {
       this.bigHit = true;
       this.m.hitStop(0.09, 0.55);
     } else {
+      // a wrap-up: the tackler latches on and they go down together, the way he was driving
       c.fallFwd = Math.sin(c.face) * hx + Math.cos(c.face) * hz > 0;
-      c.vx = c.vx * 0.4 + (hx / hl) * 1.5;
-      c.vz = c.vz * 0.4 + (hz / hl) * 1.5;
+      const ux = hx / hl;
+      const uz = hz / hl;
+      const px = (c.vx + d.vx * 0.8) / 1.8;
+      const pz = (c.vz + d.vz * 0.8) / 1.8;
+      c.vx = px * 0.55 + ux * 1.2;
+      c.vz = pz * 0.55 + uz * 1.2;
       c.setState('down', 1.4);
       d.fallFwd = true;
-      // a diver keeps flying and lands on top of him
-      d.vx *= diving ? 0.35 : 0.5;
-      d.vz *= diving ? 0.35 : 0.5;
-      if (!diving) d.setState('down', 1.0);
+      if (diving) {
+        // a diver keeps flying and lands on top of him
+        d.vx *= 0.35;
+        d.vz *= 0.35;
+      } else {
+        d.setState('down', 1.0);
+        d.vx = c.vx;
+        d.vz = c.vz;
+        d.face = angleOf(c.x - d.x, c.z - d.z);
+        const gap = len(c.x - d.x, c.z - d.z) || 1;
+        if (gap > 0.55) {
+          d.x = c.x - ((c.x - d.x) / gap) * 0.55;
+          d.z = c.z - ((c.z - d.z) / gap) * 0.55;
+        }
+      }
+      d.hug = true;
     }
     this.lastTackle = { by: d.id, on: c.id, big, x: spotX, z: spotZ };
     this.emit({ k: 'tackle', id: c.id, by: d.id, big, sack, x: Math.round(spotX * 10) / 10, z: Math.round(spotZ * 10) / 10 });

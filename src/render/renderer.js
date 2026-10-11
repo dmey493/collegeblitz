@@ -11,7 +11,7 @@ import { PlayerModel } from './player-model.js';
 import { Effects, Markers, makeBall } from './effects.js';
 import { CameraDirector } from './camera.js';
 import { bodyOfSlot } from '../sim/player.js';
-import { ROSTER_SLOTS, playerId, END } from '../sim/constants.js';
+import { ROSTER_SLOTS, playerId, teamOfId, END } from '../sim/constants.js';
 
 const tmpV = new THREE.Vector3();
 
@@ -314,12 +314,25 @@ export class GameRenderer {
         const m = this.model(p.id);
         m.root.visible = true;
         seen.add(p.id);
+        // a blocker and his man get their hands on each other
+        let opp = null;
+        if (p.state === 'engaged') {
+          let best = 1.9;
+          for (const q of view.players) {
+            if (teamOfId(q.id) === teamOfId(p.id)) continue;
+            const d = Math.hypot(q.x - p.x, q.z - p.z);
+            if (d < best) {
+              best = d;
+              opp = { x: q.x, y: q.state === 'stance' ? 1.0 : 1.38, z: q.z };
+            }
+          }
+        }
         const carrying = bv.carrier === p.id && bv.state === 'held';
         const dBall = Math.hypot(bv.x - p.x, bv.z - p.z);
         const reach = pass && flight.intended === p.id && dBall < 3.5;
         // a pass coming down nearby: hands go to it
         const ball = pass && dBall < 4.5 ? bv : null;
-        m.update({ ...p, carrying, reach, ball }, dt, ctxAnim);
+        m.update({ ...p, carrying, reach, ball, opp }, dt, ctxAnim);
       }
     }
     for (const [id, m] of this.models) if (!seen.has(id)) m.root.visible = false;

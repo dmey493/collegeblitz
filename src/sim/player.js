@@ -71,6 +71,7 @@ export class Player {
     this.st = 0; // time in state
     this.stDur = 0;
     this.fallFwd = false;
+    this.hug = false; // a tackler wrapped up on the man he took down
 
     this.job = 'idle';
     this.jd = {}; // job data
@@ -103,6 +104,7 @@ export class Player {
     this.state = s;
     this.st = 0;
     this.stDur = dur;
+    this.hug = false;
   }
 }
 

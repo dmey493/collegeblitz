@@ -210,16 +210,21 @@ export class PlayerModel {
         break;
       }
       case 'engaged': {
+        // locked up: driving with the legs, hands on the other man's chest
         const sh = Math.sin(ctx.time * 9 + this.id) * 0.15;
-        T.lean = 0.55;
-        T.bodyY = -0.14;
-        T.legFwd = [0.6 + sh, -0.3 - sh];
-        T.knee = [0.8, 0.5];
-        T.legAbd = [0.14, 0.14];
-        T.armFwd = [1.55, 1.55];
-        T.elbow = [0.55, 0.55];
-        T.armAbd = [0.25, 0.25];
+        T.lean = 0.6;
+        T.bodyY = -0.16;
+        T.legFwd = [0.6 + sh, -0.35 - sh];
+        T.knee = [0.85, 0.5];
+        T.ankle = [0.2, 0.45];
+        T.legAbd = [0.15, 0.15];
+        T.armFwd = [1.5, 1.5];
+        T.elbow = [0.7, 0.7];
+        T.armAbd = [0.2, 0.2];
         T.headX = -0.1;
+        T.twist = Math.sin(ctx.time * 5.3 + this.id * 2) * 0.12;
+        if (v.opp) this.aimArms(T, v.opp, 0.65);
+        rate = 20;
         break;
       }
       case 'throw': {
@@ -343,7 +348,12 @@ export class PlayerModel {
         T.knee = [0.2 + 0.5 * (1 - launch), 0.45];
         T.ankle = [0.9, 0.9];
         T.legAbd = [0.08, 0.12];
-        if (this.catchDive) {
+        if (v.hug) {
+          // got him: arms wrapped around his legs
+          T.armFwd = [2.3, 2.3];
+          T.armAbd = [0.12, 0.12];
+          T.elbow = [1.15, 1.15];
+        } else if (this.catchDive) {
           T.armFwd = [3.05, 3.05];
           T.armAbd = [-0.02, -0.02];
           T.elbow = [0.15, 0.15];
@@ -372,7 +382,16 @@ export class PlayerModel {
         T.ankle = [0.6, 0.6];
         T.legAbd = [0.12, 0.08];
         T.lean = 0;
-        if (k < 1) {
+        if (v.hug && !this.fallFrom) {
+          // the tackler: wrapped around the runner, riding him down and landing on top
+          T.armFwd = [lerpA(1.35, 2.0, k), lerpA(1.35, 2.0, k)];
+          T.armAbd = [0.08, 0.08];
+          T.elbow = [1.25, 1.25];
+          T.bodyY = -0.62 * k;
+          T.headX = -0.35 * k;
+          T.legFwd = [lerpA(0.4, -0.05, k), lerpA(-0.3, 0.15, k)];
+          T.knee = [lerpA(0.6, 0.35, k), lerpA(0.3, 0.6, k)];
+        } else if (k < 1) {
           // on the way down: hands go out to brace (forward) or fling up (backward)
           for (let i = 0; i < 2; i++) {
             T.armFwd[i] = lerpA(fwd ? 1.3 : 0.9, T.armFwd[i], k);

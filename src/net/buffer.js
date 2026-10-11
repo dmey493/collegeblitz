@@ -10,7 +10,7 @@ function lerpAngle(a, b, t) {
 }
 
 function unpackPlayer(r) {
-  return { id: r[0], x: r[1], z: r[2], y: r[3], face: r[4], vx: r[5], vz: r[6], state: r[7], st: r[8], turbo: !!(r[9] & 1), fallFwd: !!(r[9] & 2) };
+  return { id: r[0], x: r[1], z: r[2], y: r[3], face: r[4], vx: r[5], vz: r[6], state: r[7], st: r[8], turbo: !!(r[9] & 1), fallFwd: !!(r[9] & 2), hug: !!(r[9] & 4) };
 }
 
 export class SnapshotBuffer {
