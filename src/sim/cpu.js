@@ -67,5 +67,5 @@ export function cpuPat(m, team) {
   if (m.quarter >= 4 || m.ot) {
     if ([-2, -5, -10, 1, 5, -9, -12].includes(diff)) return 'two';
   } else if (diff === -2 || diff === 1) return 'two';
-  return 'kick';
+  return 'one';
 }

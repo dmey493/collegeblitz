@@ -127,7 +127,7 @@ Online games use the defaults.
 - 7 players a side, **4 downs to gain 30 yards** (25 or 10 selectable for vs CPU).
 - No penalties, so no pass interference either (see No flags above). Ball always spotted in the
   middle of the field.
-- TD 6, kick for 1 or go for 2 from the 3, FG 3, safety 2. Kickoffs and punts are live.
+- TD 6, FG 3, safety 2. No extra-point kick: after a TD you take a free **+1** (the middle card, where the cursor starts) or pick any play around it to go for 2 from the 3. Kickoffs and punts are live.
 - 3 straight completions or 2 straight sacks put a team **ON FIRE** (unlimited turbo).
 - Tied after regulation → college overtime from the 25.
 

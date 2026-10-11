@@ -72,11 +72,11 @@ test('every offensive play runs against every defense without errors', () => {
   }
 });
 
-test('field goals, punts and PATs resolve', () => {
-  for (const kind of ['fg', 'punt', 'pat']) {
+test('field goals and punts resolve', () => {
+  for (const kind of ['fg', 'punt']) {
     const m = new Match({ teams: ['IND', 'MICH'], humans: [false, false], seed: 9 });
     m.poss = 0;
-    m.startPlay({ kind, off: 0, ballOn: kind === 'pat' ? 97 : 70, fdOn: 100 });
+    m.startPlay({ kind, off: 0, ballOn: 70, fdOn: 100 });
     const play = m.play;
     let n = 0;
     while (!play.finished && n < 60 * 30) {
@@ -107,10 +107,13 @@ test('a tie at the end of regulation goes to overtime from the 25', () => {
 
 test('human picks and two-point tries are honored', () => {
   const m = new Match({ teams: ['IND', 'MICH'], humans: [true, true], seed: 3 });
-  m.startPatChoice(0);
-  m.command(0, { type: 'pat', choice: 'two' });
+  m.startConversion(0);
   assert.equal(m.phase, 'playSelect');
   assert.equal(m.conversion, true);
+  assert.equal(m.snapshot().ps.p1, true);
+  // only the offense can take the +1
+  m.command(1, { type: 'pick', id: 'plus1' });
+  assert.equal(m.phase, 'playSelect');
   // specials are not allowed on a conversion
   m.command(0, { type: 'pick', id: 'fg' });
   assert.equal(m.picks[0], null);
@@ -118,6 +121,30 @@ test('human picks and two-point tries are honored', () => {
   m.command(1, { type: 'pick', id: 'safe' });
   assert.equal(m.phase, 'play');
   assert.equal(m.play.kind, 'two');
+});
+
+test('no kicked extra point: the offense takes a free +1', () => {
+  const m = new Match({ teams: ['IND', 'MICH'], humans: [true, true], seed: 3 });
+  m.score = [6, 0];
+  m.startConversion(0);
+  m.command(0, { type: 'pick', id: 'plus1' });
+  assert.equal(m.score[0], 7);
+  assert.equal(m.conversion, false);
+  assert.ok(m.drainEvents().some((e) => e.k === 'conv' && e.plusOne && e.good));
+  assert.notEqual(m.phase, 'playSelect'); // on to the kickoff
+  // a human who lets the clock run out gets the +1 too
+  const m2 = new Match({ teams: ['IND', 'MICH'], humans: [true, false], seed: 3 });
+  m2.startConversion(0);
+  for (let i = 0; i < 60 * 16 && m2.phase === 'playSelect'; i++) m2.step(1 / 60);
+  assert.equal(m2.score[0], 1);
+  // from the third overtime it's a two-point play or nothing
+  const m3 = new Match({ teams: ['IND', 'MICH'], humans: [true, true], seed: 3 });
+  m3.ot = true;
+  m3.otn = 3;
+  m3.startConversion(0);
+  m3.command(0, { type: 'pick', id: 'plus1' });
+  assert.equal(m3.score[0], 0);
+  assert.equal(m3.phase, 'playSelect');
 });
 
 // Drive one human-quarterbacked pass play; `act(play, press)` fires buttons by name.

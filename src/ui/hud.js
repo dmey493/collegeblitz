@@ -131,6 +131,7 @@ export class HUD {
           break;
         case 'conv':
           if (e.two) this.callout(e.good ? 'TWO-POINT CONVERSION!' : 'NO GOOD', '', e.good ? 'gold' : 'red', 1.8);
+          else if (e.plusOne) this.callout('+1', '', 'gold', 1.4);
           break;
         case 'safety':
           this.callout('SAFETY!', '', 'hot', 2);

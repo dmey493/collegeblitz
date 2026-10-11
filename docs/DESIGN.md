@@ -29,7 +29,7 @@ likeness issues).
 * No penalties. Late hits after the whistle are allowed (the controlled player keeps moving for ~1.5 s).
 * Ball is always re-spotted in the middle of the field.
 * Passes: one forward pass, from behind the line of scrimmage. Turbo + pass = bullet pass.
-* Scoring: TD 6, PAT kick 1 or go for 2 from the 3, FG 3, safety 2.
+* Scoring: TD 6, FG 3, safety 2. No kicked extra point: after a TD the play-select screen has a free **+1** in the middle (the cursor starts on it, and it is what you get if the timer runs out); the plays around it go for 2 from the 3. From the third overtime every conversion is a 2-point play.
 * Kickoffs from the 35 with live returns; punts and field goals selectable on 4th down.
 * College touches: white-striped ball, orange pylons, college hash marks, numbers only on jerseys,
   touchback to the 25.
@@ -176,7 +176,7 @@ runs on one player's machine:
    server uses (`src/net/room.js`). A plays through an in-page loopback; B through the data
    channel. A picks team and settings, both press Ready.
 4. Clients send input (stick + press counters, ~10 Hz plus on change) and discrete commands
-   (play picks, PAT choice). The host steps the simulation at 60 Hz on a worker-driven clock
+   (play picks, including the +1). The host steps the simulation at 60 Hz on a worker-driven clock
    (keeps running in a background tab) and sends compact snapshots at 30 Hz.
 5. Clients render slightly in the past (host ~35 ms, guest 70–220 ms depending on jitter) and
    interpolate; sound/text events fire when their snapshot is reached.

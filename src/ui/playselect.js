@@ -1,8 +1,11 @@
-// The 3x3 play-select grid, plus the extra-point choice.
+// The 3x3 play-select grid. After a touchdown the middle card is a free +1 (no kicked extra
+// point); the plays around it go for two.
 import { h } from './dom.js';
 import { OFF_PAGES, DEF_PLAYS, getPlay } from '../sim/playbook.js';
 import { offenseDiagram, defenseDiagram } from './diagram.js';
 import { downText, spotText } from './hud.js';
+
+const PLUS_ONE = { id: 'plus1', name: 'TAKE THE POINT', plusOne: true };
 
 export class PlaySelect {
   constructor({ teams, myTeam, snap, onPick, onMove, lastPage = 0, labels = { move: 'ARROWS', pass: 'F' } }) {
@@ -17,6 +20,14 @@ export class PlaySelect {
     this.pages = this.offense ? OFF_PAGES.map((ids) => ids.map(getPlay)) : [DEF_PLAYS];
     this.page = Math.min(lastPage, this.pages.length - 1);
     this.cursor = 0;
+    if (this.offense && this.conv && snap.ps && snap.ps.p1) {
+      // the +1 takes the middle of the first page (the play it bumps moves to the last page)
+      const first = this.pages[0];
+      this.pages[2] = [...this.pages[2], first[4]];
+      this.pages[0] = [...first.slice(0, 4), PLUS_ONE, ...first.slice(5)];
+      this.page = 0;
+      this.cursor = 4;
+    }
     this.picked = null;
     this.el = h('div.playselect', { style: { '--tc': this.team.colors.primary, '--tl': this.team.colors.light } });
     this.header = h('div.ps-head',
@@ -49,10 +60,14 @@ export class PlaySelect {
         this.grid.append(h('div.ps-card.empty'));
         continue;
       }
-      const card = h('div.ps-card', { style: { animationDelay: `${i * 45}ms` } },
-        h('div.ps-diag', { html: this.offense ? offenseDiagram(p) : defenseDiagram(p) }),
-        h('div.ps-pname', p.name),
-        !this.offense && p.blurb ? h('div.ps-blurb', p.blurb) : null);
+      const card = p.plusOne
+        ? h('div.ps-card.ps-plus', { style: { animationDelay: `${i * 45}ms` } },
+          h('div.ps-p1', h('b', '+1'), h('span', 'NO KICK · FREE POINT')),
+          h('div.ps-pname', p.name))
+        : h('div.ps-card', { style: { animationDelay: `${i * 45}ms` } },
+          h('div.ps-diag', { html: this.offense ? offenseDiagram(p) : defenseDiagram(p) }),
+          h('div.ps-pname', p.name),
+          !this.offense && p.blurb ? h('div.ps-blurb', p.blurb) : null);
       if (this.disabled(p)) card.classList.add('disabled');
       card.addEventListener('pointerenter', () => {
         if (!this.picked && this.cursor !== i) {
@@ -148,58 +163,5 @@ export class PlaySelect {
     this.header.querySelector('.ps-timer').classList.toggle('low', snap.ps.t <= 5);
     const oppDone = snap.ps.pk[1 - this.myTeam];
     this.waiting.classList.toggle('show', !!this.picked && !oppDone);
-  }
-}
-
-export class PatChoice {
-  constructor({ team, onPick, onMove }) {
-    this.onPick = onPick;
-    this.onMove = onMove;
-    this.i = 0;
-    this.done = false;
-    this.opts = [
-      { id: 'kick', main: 'KICK IT', sub: '1 POINT · FROM THE 3' },
-      { id: 'two', main: 'GO FOR 2', sub: 'ONE PLAY · FROM THE 3' },
-    ];
-    this.cards = this.opts.map((o, i) => {
-      const c = h('div.pat-card', h('div.pat-main', o.main), h('div.pat-sub', o.sub));
-      c.addEventListener('pointerenter', () => this.focus(i));
-      c.addEventListener('click', () => {
-        this.focus(i);
-        this.pick();
-      });
-      return c;
-    });
-    this.timer = h('div.pat-timer', '8');
-    this.el = h('div.patchoice', { style: { '--tc': team.colors.primary } }, h('div.pat-title', 'EXTRA POINT'), h('div.pat-row', ...this.cards), this.timer);
-    this.paint();
-  }
-
-  focus(i) {
-    if (this.done || i === this.i) return;
-    this.i = i;
-    this.paint();
-    this.onMove && this.onMove();
-  }
-
-  paint() {
-    this.cards.forEach((c, i) => c.classList.toggle('focus', i === this.i));
-  }
-
-  pick() {
-    if (this.done) return;
-    this.done = true;
-    this.cards[this.i].classList.add('picked');
-    this.onPick(this.opts[this.i].id);
-  }
-
-  handle(evt) {
-    if (evt === 'left' || evt === 'up') this.focus(0);
-    else if (evt === 'right' || evt === 'down') this.focus(1);
-    else if (evt === 'confirm') this.pick();
-  }
-
-  update(snap) {
-    if (snap.pat) this.timer.textContent = String(Math.ceil(snap.pat.t));
   }
 }

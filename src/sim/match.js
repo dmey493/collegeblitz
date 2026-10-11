@@ -54,6 +54,7 @@ export class Match {
     this.psT = 0;
     this.cpuPickAt = [0, 0];
     this.conversion = false;
+    this.plusOne = false; // a conversion can be taken as a free +1 instead of a 2-point play
     this.stats = [newStats(), newStats()];
     this.streak = [{ comp: 0, sack: 0 }, { comp: 0, sack: 0 }];
     this.fire = [{ off: false, def: false }, { off: false, def: false }];
@@ -70,7 +71,6 @@ export class Match {
     this.bannerLines = null;
     this.bannerT = 0;
     this.bannerNext = null;
-    this.pat = null;
     this.paused = false;
     this.winner = -1;
     const recv = this.rng() < 0.5 ? 0 : 1;
@@ -134,6 +134,10 @@ export class Match {
   command(team, cmd) {
     if (!cmd || typeof cmd !== 'object') return;
     if (cmd.type === 'pick' && this.phase === 'playSelect' && !this.picks[team]) {
+      if (cmd.id === 'plus1') {
+        if (this.conversion && this.plusOne && team === this.poss) this.takePlusOne(team);
+        return;
+      }
       const p = getPlay(cmd.id);
       if (!p) return;
       const isOff = team === this.poss;
@@ -143,8 +147,6 @@ export class Match {
       this.picks[team] = p.id;
       this.emit({ k: 'picked', team });
       this.maybeStartScrimmage();
-    } else if (cmd.type === 'pat' && this.phase === 'patChoice' && this.pat && this.pat.team === team) {
-      this.choosePat(cmd.choice === 'two' ? 'two' : 'kick');
     }
   }
 
@@ -178,11 +180,6 @@ export class Match {
         break;
       case 'playSelect':
         this.stepPlaySelect(dt);
-        break;
-      case 'patChoice':
-        this.pat.t -= dt;
-        if (!this.human[this.pat.team] && this.pat.t < this.pat.cpuAt) this.choosePat(cpuPat(this, this.pat.team));
-        else if (this.pat.t <= 0) this.choosePat('kick');
         break;
       case 'play': {
         const pl = this.play;
@@ -224,6 +221,13 @@ export class Match {
   stepPlaySelect(dt) {
     this.psT -= dt;
     const elapsed = 15 - this.psT;
+    // after a touchdown the offense can take the +1 (the CPU weighs it up, a human who
+    // lets the clock run out gets it)
+    const off = this.poss;
+    if (this.conversion && this.plusOne && !this.picks[off]) {
+      if (!this.human[off] && elapsed >= this.cpuPickAt[off] && cpuPat(this, off) !== 'two') return this.takePlusOne(off);
+      if (this.human[off] && this.psT <= 0) return this.takePlusOne(off);
+    }
     for (const t of [0, 1]) {
       if (this.picks[t]) continue;
       if (!this.human[t] && elapsed >= this.cpuPickAt[t]) {
@@ -292,11 +296,6 @@ export class Match {
     const kind = play.kind;
     const fd = this.rules.fdYards;
 
-    if (kind === 'pat') {
-      if (res.good && !res.scored) this.addScore(off, 1);
-      this.emit({ k: 'conv', team: off, good: !!res.good, two: false });
-      return this.afterScore(off);
-    }
     if (kind === 'two') {
       const good = res.type === 'td' && res.team === off;
       if (good) this.addScore(off, 2);
@@ -308,7 +307,7 @@ export class Match {
     if (res.type === 'td') {
       if (!res.scored) this.addScore(res.team, 6);
       this.stats[res.team].tds++;
-      return this.startPatChoice(res.team);
+      return this.startConversion(res.team);
     }
     if (res.type === 'safety') {
       const scorer = 1 - res.team;
@@ -403,33 +402,30 @@ export class Match {
     this.startPlaySelect();
   }
 
-  // ---------------------------------------------------------------- PAT
-  startPatChoice(team) {
-    this.phase = 'patChoice';
-    this.pat = { team, t: 8, cpuAt: 8 - this.rng.range(0.7, 1.3) };
-    this.play = null;
-    this.emit({ k: 'patChoice', team });
+  // ---------------------------------------------------------------- conversion
+  // No kicked extra point: after a touchdown it's a free +1, or a play from the 3 for two.
+  startConversion(team) {
+    this.conversion = true;
+    // from the third overtime on, every conversion is a two-point play
+    this.plusOne = !(this.ot && this.otn >= 3);
+    this.poss = team;
+    this.ballOn = 97;
+    this.down = 1;
+    this.fdOn = 100;
+    this.togo = 3;
+    this.startPlaySelect();
   }
 
-  choosePat(choice) {
-    const team = this.pat.team;
-    this.pat = null;
-    this.emit({ k: 'patPick', team, choice });
-    if (choice === 'two') {
-      this.conversion = true;
-      this.poss = team;
-      this.ballOn = 97;
-      this.down = 1;
-      this.fdOn = 100;
-      this.togo = 3;
-      this.startPlaySelect();
-    } else {
-      this.startPlay({ kind: 'pat', off: team, ballOn: 97 });
-    }
+  takePlusOne(team) {
+    this.addScore(team, 1);
+    this.emit({ k: 'conv', team, good: true, two: false, plusOne: true });
+    this.plusOne = false;
+    this.afterScore(team);
   }
 
   afterScore(team) {
     this.conversion = false;
+    this.plusOne = false;
     if (this.ot) return this.endOTPossession();
     this.pendingKick = { team, on: 35 };
     this.nextAfterPlay();
@@ -585,8 +581,7 @@ export class Match {
       n: this.playNo,
     };
     if (this.phase === 'banner') s.bn = { lines: this.bannerLines, kind: this.bannerKind, t: round2(this.bannerT) };
-    if (this.phase === 'playSelect') s.ps = { t: round2(Math.max(0, this.psT)), pk: [!!this.picks[0], !!this.picks[1]] };
-    if (this.phase === 'patChoice') s.pat = { team: this.pat.team, t: round2(this.pat.t) };
+    if (this.phase === 'playSelect') s.ps = { t: round2(Math.max(0, this.psT)), pk: [!!this.picks[0], !!this.picks[1]], p1: this.conversion && this.plusOne };
     if (this.phase === 'final') s.fin = { winner: this.winner, stats: this.stats };
     if (p) {
       const b = p.ball;

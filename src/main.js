@@ -14,7 +14,7 @@ import { LocalSession } from './net/local.js';
 import { OnlineSession, defaultServerUrl, socketTransport } from './net/online.js';
 import { P2PHost, connectToHost } from './net/p2p.js';
 import { HUD } from './ui/hud.js';
-import { PlaySelect, PatChoice } from './ui/playselect.js';
+import { PlaySelect } from './ui/playselect.js';
 import { h, clear } from './ui/dom.js';
 import { brushedMetalDataURL } from './render/textures.js';
 import { titleScreen, setupScreen, howToScreen, settingsScreen, onlineScreen, lobbyScreen, pauseScreen, finalScreen } from './ui/screens.js';
@@ -430,16 +430,6 @@ class App {
           if (s.pos === me) this.psPage = page < 2 ? page : 0;
           this.audio.uiSelect();
           this.session.command({ type: 'pick', id });
-        },
-      }));
-      this.overlay && this.overlay.update && this.overlay.update(s);
-    } else if (s.ph === 'patChoice' && s.pat && s.pat.team === me) {
-      this.setOverlay(`pat-${s.n}`, () => new PatChoice({
-        team: this.teams[me],
-        onMove: this.sfx.move,
-        onPick: (choice) => {
-          this.audio.uiSelect();
-          this.session.command({ type: 'pat', choice });
         },
       }));
       this.overlay && this.overlay.update && this.overlay.update(s);
