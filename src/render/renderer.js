@@ -222,8 +222,8 @@ export class GameRenderer {
       switch (e.k) {
         case 'tackle': {
           const big = !!e.big;
-          this.effects.impact(e.x, 1.1, e.z, big);
-          this.director.kick(big ? 0.9 : 0.18);
+          this.effects.impact(e.x, e.dive ? 0.7 : 1.1, e.z, big);
+          this.director.kick(big ? 0.9 : e.dive ? 0.4 : 0.18);
           if (big) {
             this.stadium.cheer(0.6);
             this.flashT = 0.12;
@@ -247,6 +247,10 @@ export class GameRenderer {
           if (p) this.effects.turf(p.x, p.z, 8);
           break;
         }
+        case 'land':
+          // a diver hits the turf: grass and dirt fly
+          this.effects.turf(e.x, e.z, 12);
+          break;
         case 'td': {
           const p = view.byId.get(e.id);
           const T = this.teams[e.team];

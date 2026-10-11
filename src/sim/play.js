@@ -1884,6 +1884,7 @@ export class Play {
           p.vy = 0;
           p.vx *= 0.6;
           p.vz *= 0.6;
+          this.emit({ k: 'land', id: p.id, x: Math.round(p.x * 10) / 10, z: Math.round(p.z * 10) / 10 });
         }
       } else {
         const f = Math.max(0, 1 - 6 * dt);
@@ -2141,6 +2142,8 @@ export class Play {
       }
       d.hug = true;
     }
+    // a flying tackle that connects: a beat of hit-stop
+    if (diving && !big) this.m.hitStop(0.045, 0.3);
     this.lastTackle = { by: d.id, on: c.id, big, x: spotX, z: spotZ };
     this.emit({ k: 'tackle', id: c.id, by: d.id, big, sack, dive: diving, x: Math.round(spotX * 10) / 10, z: Math.round(spotZ * 10) / 10 });
     if (fumbled && !(dirOf(c.team) * spotZ >= GOAL)) {
