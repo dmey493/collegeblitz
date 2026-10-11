@@ -1252,17 +1252,24 @@ export class Play {
     for (const q of this.players) if (q.team !== qb.team && q.upright && dist(q, qb) < 2.3) pressure = true;
     let sigma = 0.18 + d * 0.012 + (pressure ? 0.5 : 0) + (qb.speed > 3.5 ? 0.3 : 0) + (bullet ? 0.12 : 0) - qb.arm * 0.1;
     sigma = Math.max(0.08, sigma);
-    const tx = P.x + this.rng.gauss() * sigma;
-    const tz = P.z + this.rng.gauss() * sigma;
+    let tx = P.x + this.rng.gauss() * sigma;
+    let tz = P.z + this.rng.gauss() * sigma;
+    // now and then low and away, a step out in front of him: he has to lay out for it
+    const low = !bullet && d > 6 && this.rng() < 0.24;
+    const rs = len(rec.vx, rec.vz);
+    if (low && rs > 1) {
+      tx += (rec.vx / rs) * 1.3;
+      tz += (rec.vz / rs) * 1.3;
+    }
     const apex = bullet ? 0.35 + d * 0.034 : 0.6 + d * 0.088;
     const hand = { x: qb.x + Math.cos(qb.face) * 0.3, z: qb.z - Math.sin(qb.face) * 0.3 };
     // Where it comes down. Like the arcade game, most passes come in high, over the receiver's
-    // reach, so he has to go up and get it (deeper and into coverage, higher still); now and then
-    // one is low and away, for a diving grab. Bullets come in at the head.
+    // reach, so he has to go up and get it (deeper and into coverage, higher still); the low ones
+    // are for a diving grab. Bullets come in at the head.
     const covered = this.players.some((q) => q.team !== qb.team && q.upright && len(q.x - P.x, q.z - P.z) < 2.5);
     let ty;
     if (bullet) ty = 1.55 + this.rng() * 0.45;
-    else if (d > 6 && this.rng() < 0.18) ty = 0.9 + this.rng() * 0.5;
+    else if (low) ty = 0.9 + this.rng() * 0.5;
     else ty = 2.45 + clamp((d - 8) * 0.04, 0, 0.6) + (covered ? 0.3 : 0) + this.rng() * 0.45;
     this.flight({ kind: 'pass', fx: hand.x, fy: 2.1, fz: hand.z, tx, ty, tz, T, apex, intended: rec, bullet, thrower: qb });
     this.passThrown = true;
