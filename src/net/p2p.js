@@ -8,6 +8,14 @@ import { Hub } from './room.js';
 const API = '/api';
 const CONNECT_TIMEOUT_MS = 20000;
 const SILENCE_MS = 8000;
+// A peer whose connection WebRTC still reports healthy gets much longer: a busy page (a slow
+// machine building textures or compiling shaders) can go quiet for a while without having
+// left. A closed tab closes the channel at once; a lost network fails the connection.
+const STALL_MS = 30000;
+const silent = (pc, heard) => {
+  const quiet = performance.now() - heard;
+  return quiet > (pc.connectionState === 'connected' ? STALL_MS : SILENCE_MS);
+};
 
 export const p2pSupported = () => typeof RTCPeerConnection === 'function';
 
@@ -135,7 +143,7 @@ function channelTransport(dc, pc) {
     if (t.onclose) t.onclose();
   };
   // the host streams 30 snapshots a second: a long silence means it is gone
-  const watch = setInterval(() => performance.now() - heard > SILENCE_MS && end(), 1000);
+  const watch = setInterval(() => silent(pc, heard) && end(), 1000);
   dc.onmessage = (e) => {
     heard = performance.now();
     if (t.onmessage) t.onmessage(e.data);
@@ -232,7 +240,7 @@ export class P2PHost {
       this.hub.disconnect(conn);
     };
     // the guest pings every 2 s and sends input 10 times a second while playing
-    const watch = setInterval(() => performance.now() - heard > SILENCE_MS && gone(), 1000);
+    const watch = setInterval(() => silent(this.pc, heard) && gone(), 1000);
     dc.onclose = gone;
     this.pc.addEventListener('connectionstatechange', () => {
       if (this.pc.connectionState === 'failed' || this.pc.connectionState === 'closed') gone();
