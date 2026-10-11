@@ -334,7 +334,7 @@ test('feel options: floatier jumps hang longer at the same height, more dives, f
   assert.ok(dives(2.5) > dives(0.5) * 1.5, 'more CPU dives');
 });
 
-test('no flags: a dive into the receiver just before the ball arrives flattens him', () => {
+test('no flags: a dive into the receiver while the pass is in the air flattens him', () => {
   const setup = (deep = 0) => {
     const m = new Match({ teams: ['IND', 'MICH'], humans: [false, false], seed: 12 });
     m.poss = 0;
@@ -349,11 +349,7 @@ test('no flags: a dive into the receiver just before the ball arrives flattens h
     const lb = play.players.find((q) => q.slot === 'LB1' && q.team === 1);
     return { m, play, rec, lb };
   };
-  // the ball is almost there: the hit lands
-  {
-    const { m, play, rec, lb } = setup();
-    const f = play.ball.f;
-    while (!play.hitWindow(f)) m.step(1 / 60);
+  const layOut = ({ m, play, rec, lb }, frames) => {
     lb.x = rec.x - 2 * Math.sin(rec.face);
     lb.z = rec.z - 2 * Math.cos(rec.face);
     lb.setState('stand');
@@ -362,28 +358,25 @@ test('no flags: a dive into the receiver just before the ball arrives flattens h
     lb.vz = 0;
     play.doDive(lb, rec.x, rec.z);
     let hit = false;
-    for (let i = 0; i < 30 && play.phase === 'live'; i++) {
+    for (let i = 0; i < frames && play.phase === 'live'; i++) {
       m.step(1 / 60);
       if (m.drainEvents().some((e) => e.k === 'interference')) hit = true;
     }
-    assert.ok(hit, 'the receiver is laid out');
-    assert.ok(!rec.upright || rec.state === 'getup', 'and is on the ground');
-    assert.ok(play.ball.carrier !== rec, 'so he can not catch it');
-  }
-  // the ball has only just been thrown: contact is just a bump
+    return hit;
+  };
+  // the ball is almost there
   {
-    const { m, play, rec, lb } = setup(45);
-    assert.ok(!play.hitWindow(play.ball.f));
-    lb.x = rec.x - 2 * Math.sin(rec.face);
-    lb.z = rec.z - 2 * Math.cos(rec.face);
-    lb.setState('stand');
-    lb.actCd = 0;
-    play.doDive(lb, rec.x, rec.z);
-    let hit = false;
-    for (let i = 0; i < 12; i++) {
-      m.step(1 / 60);
-      if (m.drainEvents().some((e) => e.k === 'interference')) hit = true;
-    }
-    assert.ok(!hit && rec.upright, 'too early: no knockdown');
+    const s = setup();
+    while (s.play.ball.f.T - s.play.ball.f.t > 0.6) s.m.step(1 / 60);
+    assert.ok(layOut(s, 30), 'the receiver is laid out');
+    assert.ok(!s.rec.upright || s.rec.state === 'getup', 'and is on the ground');
+    assert.ok(s.play.ball.carrier !== s.rec, 'so he can not catch it');
+  }
+  // a deep ball that has only just left the quarterback's hand: still fair game
+  {
+    const s = setup(45);
+    assert.ok(s.play.ball.f.T > 1.4);
+    assert.ok(layOut(s, 12), 'any time the ball is in the air');
+    assert.ok(!s.rec.upright, 'he goes down');
   }
 });

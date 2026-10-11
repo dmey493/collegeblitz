@@ -1,7 +1,7 @@
 // AI for every player who isn't being steered by a human.
 // Each job sets p.ix/p.iz (desired direction scaled 0..1) and p.wantTurbo.
 
-import { HALF_W, GOAL, dirOf } from './constants.js';
+import { HALF_W, GOAL, dirOf, CPU_HIT_TIME } from './constants.js';
 import { clamp, lerp, len, dist } from './math.js';
 
 function seek(p, tx, tz, arrive = 0.01, frac = 1) {
@@ -75,7 +75,7 @@ function hawk(play, p) {
   turbo(p, d > 1.5 && d < 5);
   // no flags: with the ball about to arrive and no play on it, take out the receiver
   const r = f.intended;
-  if (r && r.team !== p.team && r.upright && p.upright && p.y === 0 && p.actCd <= 0 && play.hitWindow(f)) {
+  if (r && r.team !== p.team && r.upright && p.upright && p.y === 0 && p.actCd <= 0 && tLeft < CPU_HIT_TIME) {
     const T = play.air.diveAir * 0.7;
     const rx = r.x + r.vx * T;
     const rz = r.z + r.vz * T;

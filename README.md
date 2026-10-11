@@ -106,9 +106,9 @@ layout under **SETTINGS → CONTROLS** (or on the vs-CPU setup screen).
 - **Defense:** Pass switches to the defender nearest the ball, Jump to leap and swat, Spin for a
   flying tackle: it homes in on a runner ahead of you from up to about five yards. Miss and you
   are on the ground for a second and a half.
-- **No flags:** in the last second before a pass arrives you can take the receiver out: Spin to
-  dive into him (it aims at him) or run him over on turbo. He goes down and can't catch it. Hit
-  him any earlier and you just bump off him. The CPU will do it to you too.
+- **No flags:** while a pass is in the air you can take the receiver out, any time, like the arcade
+  original: Spin to dive into him (it aims at him) or run him over on turbo. He goes down and can't
+  catch it. Before the throw, contact just bumps. The CPU will do it to you too.
 - Late hits after the whistle are legal.
 
 ## Arcade feel (vs CPU)

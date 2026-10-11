@@ -4,7 +4,7 @@
 import {
   HALF_W, GOAL, END, POST_Z, POST_HALF, CROSSBAR, GRAVITY, TURBO_MULT, TURBO_DRAIN, TURBO_REGEN,
   DEF_SLOTS, DIFFICULTY, TEAMMATE_LEVEL, dirOf,
-  AIR_GRAVITY, JUMP_VY, HURDLE_VY, DIVE_VY, DIVE_AIR, DIVE_SLIDE, HIT_GRAVITY, GETUP_TIME, HIT_WINDOW,
+  AIR_GRAVITY, JUMP_VY, HURDLE_VY, DIVE_VY, DIVE_AIR, DIVE_SLIDE, HIT_GRAVITY, GETUP_TIME,
 } from './constants.js';
 import { clamp, lerp, len, dist, turnToward, angleOf, wrapAngle } from './math.js';
 import { Player } from './player.js';
@@ -2029,18 +2029,14 @@ export class Play {
   }
 
   // ------------------------------------------------------------- tackling
-  // No flags in this league: in the last moments before a pass arrives, a defender who dives
-  // into the receiver or runs through him on turbo flattens him, and the ball sails on (to be
-  // picked off, or to fall incomplete).
-  hitWindow(f) {
-    return f.T - f.t < HIT_WINDOW;
-  }
-
+  // No flags in this league: while a pass is in the air, a defender who dives into the
+  // receiver or runs through him on turbo flattens him, and the ball sails on (to be picked
+  // off, or to fall incomplete).
   checkInterference() {
     const b = this.ball;
     const f = b.state === 'air' && b.f && b.f.kind === 'pass' && !b.f.resolved ? b.f : null;
     const r = f && f.intended;
-    if (!r || !r.upright || r.state === 'engaged' || !this.hitWindow(f) || f.tried.has(r.id)) return;
+    if (!r || !r.upright || r.state === 'engaged' || f.tried.has(r.id)) return;
     for (const d of this.players) {
       if (d.team === r.team || d.tackleCd > 0 || d.state === 'engaged') continue;
       const diving = d.state === 'dive' && d.st < this.air.diveAir + 0.12;
