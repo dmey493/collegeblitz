@@ -570,13 +570,12 @@ export class PlayerModel {
         break;
       }
       case 'kick': {
-        const u = Math.min(1, st / 0.35);
-        T.legFwd = [u < 0.35 ? -0.7 : 1.7, 0.05];
-        T.knee = [u < 0.35 ? 1.3 : 0.1, 0.15];
-        T.ankle = [u < 0.35 ? 0 : 0.6, 0];
-        T.armAbd = [1.1, 1.1];
-        T.lean = -0.1;
-        rate = 35;
+        // captured kick from contact through the follow-through
+        this.playClip(T, CLIPS.kick, clamp(st / 0.35, 0, 1));
+        T.bodyX = 0;
+        T.bodyZ = 0;
+        T.bodyY = Math.min(0, T.bodyY);
+        rate = 40;
         break;
       }
       case 'celebrate': {
@@ -607,7 +606,11 @@ export class PlayerModel {
           rate = 14;
           break;
         }
-        if (kind === 0) {
+        if (kind === 0 && this.id % 2 === 0) {
+          // captured: a happy, arms-up celebration
+          this.applyLoop(T, loopAt(CLIPS.happy, (ctx.time / 3.4) * Math.PI * 2 + this.id, false));
+          rate = 18;
+        } else if (kind === 0) {
           T.bodyY = Math.abs(Math.sin(tt)) * 0.35;
           T.armFwd = [2.9, 2.9];
           T.armAbd = [0.5, 0.5];
@@ -814,6 +817,27 @@ export class PlayerModel {
     }
     // lean into the cut
     T.tiltZ = clamp(-this.turnRate * speed * 0.022, -0.38, 0.38) * (wRun + 0.5 * wSide);
+  }
+
+  // Pose from a sampled loop (see loopAt).
+  applyLoop(T, c) {
+    T.tiltX = c.tiltX;
+    T.tiltZ = c.tiltZ;
+    T.hipTwist = c.hipTwist;
+    T.lean = c.lean;
+    T.twist = c.twist;
+    T.bend = c.bend;
+    T.bodyY = c.bodyY * this.legLen;
+    for (let i = 0; i < 2; i++) {
+      T.legFwd[i] = c.legFwd[i];
+      T.legAbd[i] = c.legAbd[i];
+      T.knee[i] = c.knee[i];
+      T.ankle[i] = c.foot[i] - clamp(c.legFwd[i] - c.knee[i], -0.7, 0.5) * 0.85;
+      T.armFwd[i] = c.armFwd[i];
+      T.armAbd[i] = Math.max(c.armAbd[i], this.abd * 0.6) - this.abd;
+      T.armTwist[i] = c.armTwist[i];
+      T.elbow[i] = c.elbow[i];
+    }
   }
 
   // A captured running leap (the lead leg alternates by player), stretched over this leap's

@@ -6,21 +6,26 @@
   python3 measure.py 49_04.bvh 1.32 1.80 24 > leap_a.json   # (data/049/) running leaps,
   python3 measure.py 49_05.bvh 0.41 0.92 24 > leap_b.json   # takeoff to touchdown
   python3 measure.py 78_28.bvh 1.858 2.30 16 > shuffle.json  # (data/078/) one defensive
-  python3 bake_clips.py                                       # shuffle step to his right
+                                                              # shuffle step to his right
+  python3 measure.py 10_01.bvh 4.82 5.4 20 > kick.json       # (data/010/) contact to follow-through
+  python3 measure.py 79_69.bvh 1.0 4.4 60 > happy.json       # (data/079/) celebrating
+  python3 bake_clips.py
 """
 import json
 import os
 
 CLIPS = {'getupFront': 'getup_front.json', 'getupBack': 'getup_back.json', 'leapA': 'leap_a.json', 'leapB': 'leap_b.json',
-         'shuffle': 'shuffle.json'}
+         'shuffle': 'shuffle.json', 'kick': 'kick.json', 'happy': 'happy.json'}
 # looping clips: the seam is closed (the last sample ramps onto the first, then is dropped),
 # the travel is left to the game and the hip height becomes a crouch below standing
-LOOPS = {'shuffle': {'crouch': -0.24}}
+LOOPS = {'shuffle': {'crouch': -0.24}, 'happy': {'crouch': 0}}
 here = os.path.dirname(os.path.abspath(__file__))
 lines = ['// One-shot motion-capture clips, measured in the terms of our pose rig: getting up off',
          '// the turf face down (CMU 77_16) and from the back (CMU 77_18), and two running leaps from',
          '// takeoff to touchdown (CMU 49_04 right knee leading, 49_05 left); and a loop: one',
-         '// defensive shuffle step to the right (CMU 78_28; mirror it to go left). Carnegie Mellon University',
+         '// defensive shuffle step to the right (CMU 78_28; mirror it to go left); a kick from just',
+         '// before contact through the follow-through (CMU 10_01); and a celebration loop, very happy',
+         '// (CMU 79_69). Carnegie Mellon University',
          '// Graphics Lab Motion Capture Database (mocap.cs.cmu.edu; free for research and commercial',
          '// use; created with funding from NSF EIA-0196217), BVH conversion by B. Hahne. Pelvis angles',
          '// are in a frame facing the way the player ends up facing; legs are relative to the pelvis,',
