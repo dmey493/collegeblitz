@@ -86,6 +86,37 @@ const gaitOut = {
   legFwd: [0, 0], knee: [0, 0], footPitch: [0, 0], legAbd: [0, 0], armFwd: [0, 0], armAbd: [0, 0], elbow: [0, 0],
   lean: 0, bodyY: 0, twist: 0, hipTwist: 0, roll: 0,
 };
+// Sample a looping captured clip (the shuffle) at a phase in radians; `mirror` flips it to
+// the other side (left and right swap, sideways tilts and turns change sign).
+const loopOut = {
+  legFwd: [0, 0], legAbd: [0, 0], knee: [0, 0], foot: [0, 0], armFwd: [0, 0], armAbd: [0, 0], armTwist: [0, 0], elbow: [0, 0],
+  tiltX: 0, tiltZ: 0, hipTwist: 0, lean: 0, twist: 0, bend: 0, bodyY: 0,
+};
+function loopAt(clip, phase, mirror) {
+  const n = clip.n;
+  const u = ((((phase / (Math.PI * 2)) % 1) + 1) % 1) * n;
+  const i0 = Math.floor(u) % n;
+  const i1 = (i0 + 1) % n;
+  const f = u - Math.floor(u);
+  const c = clip.t;
+  const at = (k) => c[k][i0] + (c[k][i1] - c[k][i0]) * f;
+  const sg = mirror ? -1 : 1;
+  loopOut.tiltX = at('tiltX');
+  loopOut.lean = at('lean');
+  loopOut.bodyY = at('bodyY');
+  loopOut.tiltZ = sg * at('tiltZ');
+  loopOut.hipTwist = sg * at('hipTwist');
+  loopOut.twist = sg * at('twist');
+  loopOut.bend = sg * at('bend');
+  for (const [key, src] of [['legFwd', 'legFwd'], ['legAbd', 'legAbd'], ['knee', 'knee'], ['foot', 'foot'], ['armFwd', 'armFwd'], ['armAbd', 'armAbdTotal'], ['armTwist', 'armTwist'], ['elbow', 'elbow']]) {
+    const a = at(`${src}0`);
+    const b = at(`${src}1`);
+    loopOut[key][0] = mirror ? b : a;
+    loopOut[key][1] = mirror ? a : b;
+  }
+  return loopOut;
+}
+
 // average shoulder swing angle (relative to the chest) across the captured strides
 const ARM_MEAN = (() => {
   let sum = 0;
@@ -701,7 +732,7 @@ export class PlayerModel {
     const wBack = Math.max(0, -fwd) ** 2;
     const wSide = lat * lat;
     // stride length grows with speed, as measured on real runners (and sprinters)
-    const cycle = wRun * (1.4 + 0.36 * speed) + wBack * 1.55 + wSide * 1.8;
+    const cycle = wRun * (1.4 + 0.36 * speed) + wBack * 1.55 + wSide * (0.8 + 0.15 * speed);
     this.phase += ((speed * dt) / cycle) * Math.PI * 2;
     const ph = this.phase;
     const sn = Math.sin(ph);
@@ -709,7 +740,7 @@ export class PlayerModel {
       if (i === undefined) T[key] += val * w;
       else T[key][i] += val * w;
     };
-    for (const key of ['lean', 'twist', 'bodyY', 'headX', 'hipTwist', 'tiltZ']) T[key] = 0;
+    for (const key of ['lean', 'twist', 'bodyY', 'headX', 'hipTwist', 'tiltZ', 'tiltX', 'bend']) T[key] = 0;
     for (const key of ['armFwd', 'armAbd', 'armTwist', 'elbow', 'legFwd', 'knee', 'ankle', 'legAbd']) T[key] = [0, 0];
     if (wRun > 0) {
       // motion-captured running (jog, run, fast run blended by speed), pushed further at the
@@ -760,23 +791,26 @@ export class PlayerModel {
       W('armAbd', 1, 0.12, w);
     }
     if (wSide > 0) {
-      const k = clamp(speed / 5, 0, 1);
+      // a captured defensive shuffle (low, wide, step out and close), mirrored going left
+      const c = loopAt(CLIPS.shuffle, ph, lat > 0);
       const w = wSide;
-      const spread = 0.1 + 0.22 * k * Math.abs(sn);
-      W('bodyY', undefined, -0.14, w);
-      W('lean', undefined, 0.32, w);
-      W('legFwd', 0, 0.42, w);
-      W('legFwd', 1, 0.42, w);
-      W('knee', 0, 0.75, w);
-      W('knee', 1, 0.75, w);
-      W('legAbd', 0, spread, w);
-      W('legAbd', 1, spread, w);
-      W('armFwd', 0, 0.75, w);
-      W('armFwd', 1, 0.75, w);
-      W('elbow', 0, 1.3, w);
-      W('elbow', 1, 1.3, w);
-      W('armAbd', 0, 0.2, w);
-      W('armAbd', 1, 0.2, w);
+      W('tiltX', undefined, c.tiltX, w);
+      W('tiltZ', undefined, c.tiltZ, w);
+      W('hipTwist', undefined, c.hipTwist, w);
+      W('lean', undefined, c.lean, w);
+      W('twist', undefined, c.twist, w);
+      W('bend', undefined, c.bend, w);
+      W('bodyY', undefined, c.bodyY * this.legLen, w);
+      for (let i = 0; i < 2; i++) {
+        W('legFwd', i, c.legFwd[i], w);
+        W('legAbd', i, c.legAbd[i], w);
+        W('knee', i, c.knee[i], w);
+        W('ankle', i, c.foot[i] - clamp(c.legFwd[i] - c.knee[i], -0.7, 0.5) * 0.85, w);
+        W('armFwd', i, c.armFwd[i], w);
+        W('armAbd', i, Math.max(c.armAbd[i], this.abd * 0.6) - this.abd, w);
+        W('armTwist', i, c.armTwist[i], w);
+        W('elbow', i, c.elbow[i], w);
+      }
     }
     // lean into the cut
     T.tiltZ = clamp(-this.turnRate * speed * 0.022, -0.38, 0.38) * (wRun + 0.5 * wSide);

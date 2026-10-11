@@ -138,12 +138,12 @@ University Graphics Lab Motion Capture Database ([mocap.cs.cmu.edu](http://mocap
 free for research and commercial use; the database was created with funding from NSF
 EIA-0196217), via B. Hahne's BVH conversion. So is getting up off the turf, face down or from
 the back, and the legs and body of a leap for the ball or a hurdle (a captured running leap,
-stretched over the arcade hang time). The baked tables live in `src/render/gait.js` and `src/render/clips.js`; `tools/gait/`
+stretched over the arcade hang time), and a defender's side shuffle. The baked tables live in `src/render/gait.js` and `src/render/clips.js`; `tools/gait/`
 has the scripts that measure the clips and regenerate them.
 
 ## Known limitations of the mockup
 
 - No client-side prediction yet, so the guest's player feels a little delayed above ~100 ms ping.
-- Running, leaping and hurdling, and getting up off the turf are motion-captured (CMU database);
-  dives, tackles and tumbles are procedural.
+- Running, the defensive shuffle, leaping and hurdling, and getting up off the turf are
+  motion-captured (CMU database); dives, tackles, tumbles and the backpedal are procedural.
 - Two teams, 21 offensive and 9 defensive plays.

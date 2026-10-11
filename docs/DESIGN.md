@@ -79,8 +79,9 @@ steering, the human QB takes his drop automatically.
   database (thigh swing, knee fold, foot plant, arm swing, elbow bend, lean, shoulder and hip
   counter-rotation, pelvis roll, hip bounce) and blended by speed, then pushed further at the
   game's sprint and turbo speeds (longer stride, higher heel kick, harder arm pump). Stride
-  length grows with speed as it does for real sprinters. Backpedals and side shuffles are blended
-  in from the body-relative velocity, the body leans into cuts, and leaps, layouts, flying
+  length grows with speed as it does for real sprinters. Side shuffles are a captured defensive
+  shuffle (low and wide, step out and close; mirrored going left), backpedals are procedural,
+  and all of them are blended from the body-relative velocity, the body leans into cuts, and leaps, layouts, flying
   tackles, big-hit tumbles and falls have dedicated motions. Getting up is motion-captured too:
   a push-up off the turf face down, or a sit-up and roll to the knees from the back.
 * Leaps and hurdles use captured running leaps (one knee driving up, the trail leg kicking back,
