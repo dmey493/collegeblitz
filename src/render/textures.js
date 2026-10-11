@@ -696,6 +696,19 @@ export function uniformTexture(team, num, size = 512, grime = 0.6) {
   for (let y = T.y + 2; y < T.y + T.h; y += 4) for (let x = T.x + ((y / 4) % 2) * 2; x < T.x + T.w; x += 4) g.fillRect(x, y, 1.6, 1.6);
   band(T, 0.975, 1, trim);
   band(T, 0.962, 0.975, C.dark);
+  // V-neck collar trim at the front
+  g.save();
+  g.lineJoin = 'miter';
+  for (const [w, colr] of [[9, C.dark], [5, trim]]) {
+    g.strokeStyle = colr;
+    g.lineWidth = w;
+    g.beginPath();
+    g.moveTo(...atOf(T, 0.685, 0.99));
+    g.lineTo(...atOf(T, 0.75, 0.895));
+    g.lineTo(...atOf(T, 0.815, 0.99));
+    g.stroke();
+  }
+  g.restore();
   for (const k of ['front', 'back']) {
     const m = TORSO_MARKS[k];
     const [x, y] = atOf(T, m.u, m.v);
@@ -889,26 +902,44 @@ function tone(hexColor, k) {
 
 // Muscle groups on the limb layouts, shared by the color map and the normal map:
 // [region, u, v, rx, ry, height] in region space (u wraps, v = 1 at the top of the region).
+// The limb texture is stretched about 2.7x more along the arm than around it, so long
+// bellies are tall, narrow ellipses here.
 const MUSCLES = [
-  ['upper', 0.25, 0.52, 0.11, 0.3, 1], // biceps
-  ['upper', 0.75, 0.62, 0.13, 0.28, 0.8], // triceps (long head)
-  ['upper', 0.88, 0.5, 0.06, 0.22, 0.6], // triceps (lateral head)
-  ['upper', 0.0, 0.85, 0.15, 0.2, 0.7], // deltoid
-  ['upper', 1.0, 0.85, 0.15, 0.2, 0.7],
-  ['fore', 0.1, 0.78, 0.09, 0.2, 1], // brachioradialis
-  ['fore', 0.38, 0.72, 0.1, 0.22, 0.8], // flexors
-  ['fore', 0.82, 0.7, 0.1, 0.24, 0.6], // extensors
-  ['fore', 0.22, 0.25, 0.03, 0.2, 0.35], // tendons at the wrist
-  ['fore', 0.32, 0.25, 0.025, 0.2, 0.3],
+  ['upper', 0.0, 0.93, 0.19, 0.32, 0.9], // deltoid (wraps the outside)
+  ['upper', 1.0, 0.93, 0.19, 0.32, 0.9],
+  ['upper', 0.27, 0.5, 0.12, 0.52, 1], // biceps
+  ['upper', 0.72, 0.58, 0.12, 0.5, 0.85], // triceps (long head)
+  ['upper', 0.88, 0.66, 0.07, 0.34, 0.6], // triceps (lateral head)
+  ['upper', 0.09, 0.28, 0.06, 0.24, 0.45], // brachialis
+  ['fore', 0.09, 0.7, 0.09, 0.42, 1], // brachioradialis
+  ['fore', 0.38, 0.68, 0.12, 0.44, 0.8], // flexors
+  ['fore', 0.85, 0.64, 0.1, 0.44, 0.65], // extensors
+  ['fore', 0.22, 0.2, 0.022, 0.2, 0.35], // tendons at the wrist
+  ['fore', 0.31, 0.2, 0.02, 0.2, 0.3],
+];
+// Grooves between the muscle groups: [region, u, v, rx, ry, depth]
+const GROOVES = [
+  ['upper', 0.5, 0.45, 0.035, 0.55, 1], // inside, between biceps and triceps
+  ['upper', 0.14, 0.42, 0.025, 0.32, 0.7], // biceps / brachialis
+  ['upper', 0.0, 0.6, 0.03, 0.2, 0.6], // deltoid insertion
+  ['upper', 1.0, 0.6, 0.03, 0.2, 0.6],
+  ['upper', 0.8, 0.45, 0.02, 0.3, 0.5], // between the triceps heads
+  ['fore', 0.22, 0.62, 0.02, 0.4, 0.7], // brachioradialis / flexors
+  ['fore', 0.6, 0.6, 0.03, 0.42, 0.6], // flexors / extensors (the ulna line)
+  ['fore', 0.97, 0.66, 0.02, 0.36, 0.5],
 ];
 
 function paintMuscles(g, S, light, dark, alpha) {
+  for (const [region, u, v, rx, ry, k] of GROOVES) {
+    const b = boxOf(SKIN_ATLAS[region], S);
+    softBlob(g, ...atOf(b, u, v), rx * b.w, ry * b.h, 0, dark, alpha * 0.55 * k, 0.2);
+  }
   for (const [region, u, v, rx, ry, k] of MUSCLES) {
     const b = boxOf(SKIN_ATLAS[region], S);
     const [x, y] = atOf(b, u, v);
-    // shadowed groove around, lit belly in the middle (light from above)
-    softBlob(g, x, y + ry * b.h * 0.15, rx * b.w * 1.25, ry * b.h * 1.15, 0, dark, alpha * 0.5 * k, 0.3);
-    softBlob(g, x, y - ry * b.h * 0.15, rx * b.w, ry * b.h, 0, light, alpha * k, 0.25);
+    // a shadowed edge all round, the lit belly toward the top (light from above)
+    softBlob(g, x, y + ry * b.h * 0.08, rx * b.w * 1.2, ry * b.h * 1.08, 0, dark, alpha * 0.4 * k, 0.45);
+    softBlob(g, x, y - ry * b.h * 0.12, rx * b.w * 0.85, ry * b.h * 0.8, 0, light, alpha * 0.75 * k, 0.2);
   }
 }
 
@@ -1024,7 +1055,11 @@ export function skinNormalMap() {
   for (const [region, u, v, rx, ry, k] of MUSCLES) {
     const b = boxOf(SKIN_ATLAS[region], S);
     const [x, y] = atOf(b, u, v);
-    softBlob(g, x, y, rx * b.w * 1.1, ry * b.h, 0, 'rgb(255,255,255)', 0.55 * k, 0.15);
+    softBlob(g, x, y, rx * b.w * 1.1, ry * b.h, 0, 'rgb(255,255,255)', 0.5 * k, 0.15);
+  }
+  for (const [region, u, v, rx, ry, k] of GROOVES) {
+    const b = boxOf(SKIN_ATLAS[region], S);
+    softBlob(g, ...atOf(b, u, v), rx * b.w * 1.3, ry * b.h, 0, 'rgb(0,0,0)', 0.45 * k, 0.2);
   }
   skinNormals = heightToNormals(c, 3);
   return skinNormals;
