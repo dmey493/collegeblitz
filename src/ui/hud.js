@@ -105,9 +105,14 @@ export class HUD {
         case 'tackle':
           if (e.sack) this.callout('SACKED!', '', 'red', 1.6);
           else if (e.big) this.popup('BIG HIT!', 'hot');
+          else if (e.dive) this.popup('FLYING TACKLE!', 'hot');
           break;
         case 'incomplete':
           this.callout('INCOMPLETE', '', 'white', 1.2);
+          break;
+        case 'catch':
+          if (e.air) this.popup('WHAT A GRAB!', 'hot');
+          else if (e.layout) this.popup('DIVING CATCH!', 'hot');
           break;
         case 'drop':
           this.popup('DROPPED!', 'bad');

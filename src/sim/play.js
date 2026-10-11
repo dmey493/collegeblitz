@@ -1435,7 +1435,8 @@ export class Play {
     this.passCaught = p;
     this.reveal();
     this.onPossession(p, false);
-    this.emit({ k: 'catch', id: p.id });
+    // air: caught at the top of a leap; layout: caught diving
+    this.emit({ k: 'catch', id: p.id, air: p.y > 0.3, layout: p.state === 'dive' });
   }
 
   intercept(p) {
@@ -2141,7 +2142,7 @@ export class Play {
       d.hug = true;
     }
     this.lastTackle = { by: d.id, on: c.id, big, x: spotX, z: spotZ };
-    this.emit({ k: 'tackle', id: c.id, by: d.id, big, sack, x: Math.round(spotX * 10) / 10, z: Math.round(spotZ * 10) / 10 });
+    this.emit({ k: 'tackle', id: c.id, by: d.id, big, sack, dive: diving, x: Math.round(spotX * 10) / 10, z: Math.round(spotZ * 10) / 10 });
     if (fumbled && !(dirOf(c.team) * spotZ >= GOAL)) {
       this.fumble(spotX, spotZ, big ? 'bigHit' : 'hit');
       return;

@@ -54,6 +54,8 @@ const CALLS = {
   first: ['First down!'],
   late: ['Late hit!'],
   juke: ['Spin move!', 'Look at that move!'],
+  grab: ['What a catch!', 'He went up and got it!', 'Unbelievable grab!'],
+  layout: ['Diving catch!', 'He laid out for it!'],
 };
 
 class App {
@@ -480,6 +482,16 @@ class App {
           break;
         case 'catch':
           A.catchBall();
+          if (e.air || e.layout) {
+            A.cheer(0.55, 1.6);
+            if (Math.random() < 0.55) say(e.layout ? 'layout' : 'grab');
+          }
+          break;
+        case 'dive':
+          A.whoosh(0.7);
+          break;
+        case 'jump':
+          A.whoosh(1.4);
           break;
         case 'kick':
           A.kick();

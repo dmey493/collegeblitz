@@ -223,9 +223,10 @@ export class AudioEngine {
     this.tone(420, { a: 0.002, d: 0.05, peak: 0.3, slideTo: 220 });
   }
 
-  whoosh() {
+  // pitch: < 1 a heavier body through the air (a dive), > 1 a quick hop
+  whoosh(pitch = 1) {
     if (!this.ctx) return;
-    this.burst({ a: 0.02, d: 0.22, peak: 0.18, freq: 300, sweepTo: 1500, q: 0.8 });
+    this.burst({ a: 0.02, d: 0.22 / Math.sqrt(pitch), peak: 0.18, freq: 300 * pitch, sweepTo: 1500 * pitch, q: 0.8 });
   }
 
   // ---------------------------------------------------------------- ui + stingers
