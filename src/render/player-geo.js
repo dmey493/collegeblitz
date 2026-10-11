@@ -440,27 +440,30 @@ function buildArm(pieces, B, J, s, tag, h, glove) {
   });
   loft(skin, ringsU.slice(0, 6), armOpts(SKIN_ATLAS.upper, -0.13, -0.33));
   loft(skin, ringsU.slice(5), armOpts(SKIN_ATLAS.fore, -0.33, -0.615));
-  // wristband
-  loft(gear, [at(-0.56, 0.052), at(-0.6, 0.05), at(-0.625, 0.048)], { seg: 16, color: () => hex('#f2f2f0'), weight: one(el) });
-  // glove: palm, four fingers and a thumb, gently curled
+  // wristband: just outside the forearm all the way round (same ring count, so it never cuts
+  // into the skin in a zigzag), its edges rolled in
+  loft(gear, [at(-0.548, 0.0585), at(-0.556, 0.0618), at(-0.585, 0.0558), at(-0.612, 0.0512), at(-0.62, 0.0478)], { seg: 24, a0, dir, color: () => hex('#f2f2f0'), weight: one(el) });
+  // glove: palm, four fingers and a thumb, gently curled; sized for a lineman's mitt (G),
+  // since a small hand on a big forearm reads as a toy
   const Hd = J[hand];
-  const g = (x, y, z) => [Hd[0] + x * s, Hd[1] + y * h, Hd[2] + z];
+  const G = 1.15;
+  const g = (x, y, z) => [Hd[0] + x * s * G, Hd[1] + y * h * G, Hd[2] + z * G];
   const gloveW = { weight: one(hand), color: ({ n }) => mul(glove, n[0] * -s > 0.4 ? 0.78 : 1) };
-  ellipsoid(gear, g(0.002, -0.045, 0.004), [0.024 * B.arm, 0.05 * B.arm, 0.045 * B.arm], gloveW, 12, 10);
+  ellipsoid(gear, g(0.002, -0.045, 0.004), [0.024 * B.arm * G, 0.05 * B.arm * G, 0.045 * B.arm * G], gloveW, 12, 10);
   const fingers = [[0.03, 0.068], [0.011, 0.074], [-0.009, 0.071], [-0.027, 0.06]];
   for (const [z, l] of fingers) {
     const k = l / 0.07;
     const p0 = g(0.0, -0.085, z);
     const p1 = g(-0.008, -0.085 - 0.038 * k, z * 1.05);
     const p2 = g(-0.022, -0.085 - 0.064 * k, z * 1.1);
-    capsule(gear, p0, p1, 0.0105 * B.arm, gloveW);
-    capsule(gear, p1, p2, 0.0098 * B.arm, gloveW);
+    capsule(gear, p0, p1, 0.0105 * B.arm * G, gloveW);
+    capsule(gear, p1, p2, 0.0098 * B.arm * G, gloveW);
   }
   const t0 = g(-0.012, -0.03, 0.036);
   const t1 = g(-0.026, -0.058, 0.052);
   const t2 = g(-0.034, -0.083, 0.056);
-  capsule(gear, t0, t1, 0.012 * B.arm, gloveW);
-  capsule(gear, t1, t2, 0.0105 * B.arm, gloveW);
+  capsule(gear, t0, t1, 0.012 * B.arm * G, gloveW);
+  capsule(gear, t1, t2, 0.0105 * B.arm * G, gloveW);
 }
 
 // Leg: thigh with pads and a knee pad inside the pants, a calf in a ribbed sock, taped
