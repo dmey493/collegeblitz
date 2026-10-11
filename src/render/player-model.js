@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { blobTexture, uniformTexture, uniformNormalMap, helmetTexture, skinTexture, skinNormalMap } from './textures.js';
 import { BODY, buildBones, buildPlayerGeometry, rigSpec } from './player-geo.js';
+import { GAITS } from './gait.js';
 
 const SKINS = ['#f1c7a3', '#d9a476', '#b97c4f', '#8a5636', '#5d3a25', '#ebb995'];
 
@@ -75,6 +76,47 @@ const wrap = (a) => {
 };
 const tmpA = new THREE.Vector3();
 
+// Motion-captured running: sample a gait table at a stride phase (radians), and blend the
+// jog, run and fast-run tables by speed (yards per second).
+const SIDES = ['legFwd', 'knee', 'footPitch', 'legAbd', 'armFwd', 'armAbdTotal', 'elbow'];
+const MIDS = ['lean', 'bodyY', 'twist', 'hipTwist', 'roll'];
+const gaitOut = {
+  legFwd: [0, 0], knee: [0, 0], footPitch: [0, 0], legAbd: [0, 0], armFwd: [0, 0], armAbd: [0, 0], elbow: [0, 0],
+  lean: 0, bodyY: 0, twist: 0, hipTwist: 0, roll: 0,
+};
+// average shoulder swing angle (relative to the chest) across the captured strides
+const ARM_MEAN = (() => {
+  let sum = 0;
+  let n = 0;
+  for (const g of Object.values(GAITS)) {
+    for (let i = 0; i < g.n; i++) {
+      sum += g.t.armFwd0[i] + g.t.armFwd1[i] + 2 * g.t.lean[i];
+      n += 2;
+    }
+  }
+  return sum / n;
+})();
+
+function gaitAt(speed, phase) {
+  const [ga, gb, f] = speed < 4.5 ? [GAITS.jog, GAITS.jog, 0]
+    : speed < 7 ? [GAITS.jog, GAITS.run, (speed - 4.5) / 2.5]
+      : [GAITS.run, GAITS.fast, Math.min(1, (speed - 7) / 2)];
+  const n = ga.n;
+  const u = (((phase / (Math.PI * 2)) % 1) + 1) % 1 * n;
+  const i0 = Math.floor(u) % n;
+  const i1 = (i0 + 1) % n;
+  const fr = u - Math.floor(u);
+  const at = (arr) => arr[i0] + (arr[i1] - arr[i0]) * fr;
+  const mix = (key) => at(ga.t[key]) * (1 - f) + at(gb.t[key]) * f;
+  for (const k of SIDES) {
+    const out = k === 'armAbdTotal' ? gaitOut.armAbd : gaitOut[k];
+    out[0] = mix(`${k}0`);
+    out[1] = mix(`${k}1`);
+  }
+  for (const k of MIDS) gaitOut[k] = mix(k);
+  return gaitOut;
+}
+
 const basePose = () => ({
   tiltX: 0, tiltZ: 0, bodyY: 0, spin: 0, lean: 0.06, twist: 0, headX: 0, hipTwist: 0,
   armFwd: [0.12, 0.12], armAbd: [0.1, 0.1], armTwist: [0, 0], elbow: [0.32, 0.32],
@@ -92,6 +134,8 @@ export class PlayerModel {
     // bulkier players carry their arms further out from the body
     this.abd = 0.13 + (B.w - 1) * 0.5;
     this.hipY = rigSpec(B).pelvis[2];
+    // hip to ankle, to scale the captured hip bounce (measured in leg lengths)
+    this.legLen = 0.945 * B.h;
     this.root = new THREE.Group();
 
     const skinIdx = (id * 7 + num) % SKINS.length;
@@ -174,7 +218,8 @@ export class PlayerModel {
 
     if (moving) {
       this.locomotion(T, v, speed, dt);
-      rate = 22;
+      // follow the captured motion closely
+      rate = 40;
     } else {
       // stride phase settles so the next run starts cleanly
       if (s === 'stand' || s === 'celebrate') {
@@ -664,7 +709,8 @@ export class PlayerModel {
     const wRun = Math.max(0, fwd) ** 2;
     const wBack = Math.max(0, -fwd) ** 2;
     const wSide = lat * lat;
-    const cycle = wRun * (2.2 + 0.26 * speed) + wBack * 1.55 + wSide * 1.8;
+    // stride length grows with speed, as measured on real runners (and sprinters)
+    const cycle = wRun * (1.4 + 0.36 * speed) + wBack * 1.55 + wSide * 1.8;
     this.phase += ((speed * dt) / cycle) * Math.PI * 2;
     const ph = this.phase;
     const sn = Math.sin(ph);
@@ -675,30 +721,32 @@ export class PlayerModel {
     for (const key of ['lean', 'twist', 'bodyY', 'headX', 'hipTwist', 'tiltZ']) T[key] = 0;
     for (const key of ['armFwd', 'armAbd', 'armTwist', 'elbow', 'legFwd', 'knee', 'ankle', 'legAbd']) T[key] = [0, 0];
     if (wRun > 0) {
-      const run = clamp(speed / 9, 0, 1);
-      const A = 0.3 + 0.55 * run + (v.turbo ? 0.1 : 0);
-      const fold = 0.3 + 1.45 * A;
+      // motion-captured running (jog, run, fast run blended by speed), pushed further at the
+      // game's sprint and turbo speeds: longer thigh swing, higher heel kick, harder arm drive
+      const g = gaitAt(speed, ph);
+      const ex = clamp((speed - 7) / 4, 0, 1) + (v.turbo ? 0.25 : 0);
       const w = wRun;
-      W('legFwd', 0, 0.1 * run + A * sn, w);
-      W('legFwd', 1, 0.1 * run - A * sn, w);
-      W('knee', 0, 0.18 + fold * Math.max(0, Math.sin(ph + 1.25)) ** 1.4, w);
-      W('knee', 1, 0.18 + fold * Math.max(0, Math.sin(ph + 1.25 + Math.PI)) ** 1.4, w);
-      W('ankle', 0, 0.55 * run * Math.max(0, -sn), w);
-      W('ankle', 1, 0.55 * run * Math.max(0, sn), w);
-      W('legAbd', 0, 0.03, w);
-      W('legAbd', 1, 0.03, w);
-      // pumping arms: the lean tips the shoulders forward, so the swing is biased forward
-      const fwdBias = 0.25 + 0.35 * run;
-      W('armFwd', 0, fwdBias - 1.0 * A * sn, w);
-      W('armFwd', 1, fwdBias + 1.0 * A * sn, w);
-      W('elbow', 0, 1.5 - 0.3 * sn, w);
-      W('elbow', 1, 1.5 + 0.3 * sn, w);
-      W('armAbd', 0, 0.05, w);
-      W('armAbd', 1, 0.05, w);
-      W('lean', undefined, 0.1 + 0.3 * run + (v.turbo ? 0.12 : 0), w);
-      W('twist', undefined, -0.16 * run * sn, w);
-      W('hipTwist', undefined, 0.1 * run * sn, w);
-      W('bodyY', undefined, run * (0.075 * Math.abs(sn) - 0.06), w);
+      for (let i = 0; i < 2; i++) {
+        const legF = g.legFwd[i] * (1 + 0.3 * ex) + 0.04 * ex;
+        const knee = g.knee[i] * (1 + 0.16 * ex);
+        W('legFwd', i, legF, w);
+        W('knee', i, knee, w);
+        // the captured foot pitch, expressed through the rig's own foot compensation
+        const footRot = g.footPitch[i] + legF - knee;
+        W('ankle', i, footRot - clamp(legF - knee, -0.7, 0.5) * 0.85, w);
+        W('legAbd', i, Math.max(0, g.legAbd[i]) + 0.03, w);
+        // arm angles were measured against the vertical; the rig's shoulders lean with the chest.
+        // The captured runners jogged with a lazy arm swing: football players pump hard
+        const arm = g.armFwd[i] + g.lean;
+        W('armFwd', i, ARM_MEAN + (arm - ARM_MEAN) * (1.5 + 0.5 * ex) + 0.18 + 0.12 * ex, w);
+        W('armAbd', i, Math.max(g.armAbd[i], this.abd) - this.abd + 0.04, w);
+        W('elbow', i, g.elbow[i], w);
+      }
+      W('lean', undefined, g.lean + 0.1 * ex, w);
+      W('twist', undefined, g.twist * (1 + 0.25 * ex), w);
+      W('hipTwist', undefined, g.hipTwist, w);
+      W('tiltZ', undefined, g.roll * 0.5, w);
+      W('bodyY', undefined, g.bodyY * this.legLen - 0.02 - 0.04 * clamp(speed / 9, 0, 1), w);
     }
     if (wBack > 0) {
       const k = clamp(speed / 6, 0, 1);

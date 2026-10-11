@@ -133,9 +133,14 @@ test/               headless engine, controls and networking tests (npm test)
 Every texture (uniforms, helmets, field paint, crowd, state outlines), every player model and
 every sound is generated at runtime, so there are no art or audio assets to license.
 
+The running animation is driven by motion capture: gait cycles measured from the Carnegie Mellon
+University Graphics Lab Motion Capture Database ([mocap.cs.cmu.edu](http://mocap.cs.cmu.edu/),
+free for research and commercial use; the database was created with funding from NSF
+EIA-0196217), via B. Hahne's BVH conversion. The baked tables live in `src/render/gait.js`;
+`tools/gait/` has the scripts that measure the clips and regenerate them.
+
 ## Known limitations of the mockup
 
 - No client-side prediction yet, so the guest's player feels a little delayed above ~100 ms ping.
-- Animation is procedural (stride-driven runs, leaps, flying tackles, tumbles) rather than
-  motion capture.
+- Running is motion-captured (CMU database); leaps, dives, tackles and tumbles are procedural.
 - Two teams, 21 offensive and 9 defensive plays.

@@ -75,9 +75,13 @@ steering, the human QB takes his drop automatically.
 * Dives are flying tackles: launched at where the runner will be, about 0.44 s flat out in the
   air, then a belly slide. A miss costs the diver ~1.5 s on the ground; a runner can still
   break a diving arm tackle, spin out of it or hurdle it.
-* Animation runs on stride length (long, powerful strides at speed, heel kick, pumping arms),
-  blends in backpedals and side shuffles from the body-relative velocity, leans into cuts, and
-  has dedicated leap, layout, flying-tackle, big-hit tumble, fall and get-up motions.
+* Running is motion-captured: jog, run and fast-run cycles measured from the CMU motion-capture
+  database (thigh swing, knee fold, foot plant, arm swing, elbow bend, lean, shoulder and hip
+  counter-rotation, pelvis roll, hip bounce) and blended by speed, then pushed further at the
+  game's sprint and turbo speeds (longer stride, higher heel kick, harder arm pump). Stride
+  length grows with speed as it does for real sprinters. Backpedals and side shuffles are blended
+  in from the body-relative velocity, the body leans into cuts, and leaps, layouts, flying
+  tackles, big-hit tumbles, falls and get-ups have dedicated motions.
 * Acrobatics vary: a leap is a two-handed high-point, a one-handed stab with the body twisting
   to the ball and the legs scissoring, or a sky-high grab with the heels tucked; the shoulders
   and eyes turn to a ball coming over a shoulder. Layouts are two-handed or one-handed on the
