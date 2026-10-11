@@ -364,11 +364,18 @@ export function buildPlayerGeometry(B, team) {
 
   // ---- pants: belt line, seat and crotch; thighs over thigh and knee pads
   const legW = 1 + (B.leg - 1) * 0.8;
+  // glutes round out behind and fold into the hamstrings
   loft(uniform, [
-    [1.235, 0.21, 0.156], [1.18, 0.214, 0.158], [1.1, 0.222, 0.17], [1.03, 0.218, 0.168], [0.985, 0.17, 0.126], [0.962, 0.08, 0.06],
+    [1.235, 0.21, 0.156], [1.18, 0.214, 0.16], [1.11, 0.222, 0.172], [1.05, 0.22, 0.172], [1.0, 0.192, 0.15], [0.97, 0.13, 0.1], [0.955, 0.06, 0.05],
   ].map(([y, rx, rz], k) => ({
     c: [0, Y(y), k > 3 ? -0.01 : 0], rx: rx * legW * (k < 2 ? lerp(1, B.gut, 0.3) : 1), rz: rz * legW, n: 2.4,
-    mod: (a) => 1 + (y < 1.15 ? 0.12 * Math.max(0, -Math.sin(a)) ** 2 : 0) + (k < 2 ? (B.gut - 1) * 0.5 * Math.max(0, Math.sin(a)) : 0),
+    mod: (a) => {
+      const back = Math.max(0, -Math.sin(a)) ** 2;
+      // two cheeks either side of the seam, not one shelf
+      const cheeks = 0.5 + 0.5 * Math.abs(Math.cos(a)) ** 0.6;
+      const glute = 0.2 * window1(y, 0.99, 1.13, 0.05) * back * cheeks;
+      return 1 + glute + (k < 2 ? (B.gut - 1) * 0.5 * Math.max(0, Math.sin(a)) : 0);
+    },
   })), {
     seg: 28,
     uv: ({ a01, t }) => inAtlas(ATLAS.pelvis, 1 - a01, 1 - t),
