@@ -240,11 +240,13 @@ export class PlayerModel {
     this.reachHint = !!(v.ball || v.carrying);
     this.lastFallFwd = !!v.fallFwd;
     this.seed = ctx.celebrateSeed || 0;
+    this.airG = ctx.airG || 0;
     // time this leap will spend in the air, from how high it is after how long (the sim's
     // leaps vary in height to meet the ball)
     if ((s === 'jump' || s === 'hurdle') && st > 0.03 && st < 0.2 && v.y > 0.02) {
-      const vy0 = v.y / st + 0.5 * AIR_GRAVITY * st;
-      this.airT = clamp((2 * vy0) / AIR_GRAVITY, 0.3, 1.0);
+      const g = ctx.airG || AIR_GRAVITY;
+      const vy0 = v.y / st + 0.5 * g * st;
+      this.airT = clamp((2 * vy0) / g, 0.3, 1.4);
     }
     // where the ball is relative to the way he faces (+ = his left), for turning to it
     this.ballRel = v.ball ? wrap(Math.atan2(v.ball.x - v.x, v.ball.z - v.z) - v.face) : 0;
@@ -709,7 +711,11 @@ export class PlayerModel {
     // a different move each time: picked per player and per play
     const roll = (this.id * 7 + this.seed * 13 + (s === 'dive' ? 5 : 0)) % 6;
     if (s === 'jump') this.leapStyle = roll % 3;
-    if (s === 'jump' || s === 'hurdle') this.airT = s === 'jump' ? (2 * JUMP_VY) / AIR_GRAVITY : (2 * HURDLE_VY) / AIR_GRAVITY;
+    if (s === 'jump' || s === 'hurdle') {
+      // until the height says otherwise: the default leap, stretched by the hang-time rule
+      const hang = Math.sqrt(AIR_GRAVITY / (this.airG || AIR_GRAVITY));
+      this.airT = ((s === 'jump' ? 2 * JUMP_VY : 2 * HURDLE_VY) / AIR_GRAVITY) * hang;
+    }
     if (s === 'dive') {
       this.catchDive = this.reachHint;
       this.diveStyle = roll % 2;

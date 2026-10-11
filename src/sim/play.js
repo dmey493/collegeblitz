@@ -33,6 +33,16 @@ export class Play {
     // the way the screen faces: behind the offense, then behind whoever has the ball after a
     // turnover or on a return (the camera follows it and the controls are screen-relative)
     this.viewDir = this.dir;
+    // arcade feel from the match rules: a longer hang keeps the same height (lower gravity,
+    // softer takeoff), pace scales everyone's speed and quickness
+    const R = match.rules || {};
+    const hang = R.hang || 1;
+    this.air = {
+      g: AIR_GRAVITY / (hang * hang), jump: JUMP_VY / hang, hurdle: HURDLE_VY / hang,
+      dive: DIVE_VY / hang, diveAir: DIVE_AIR * hang,
+    };
+    this.pace = R.pace || 1;
+    this.diveMul = R.dives ?? 1;
     this.ballOn = spec.ballOn;
     this.losZ = this.dir * (spec.ballOn - 50);
     this.fdZ = spec.fdOn != null && spec.fdOn < 100 && this.kind === 'scrimmage' ? this.dir * (spec.fdOn - 50) : null;
@@ -903,16 +913,16 @@ export class Play {
 
   doHurdle(p) {
     if (p.actCd > 0 || p.y > 0.01 || !p.upright) return;
-    p.setState('hurdle', (2 * HURDLE_VY) / AIR_GRAVITY);
-    p.vy = HURDLE_VY;
+    p.setState('hurdle', (2 * this.air.hurdle) / this.air.g);
+    p.vy = this.air.hurdle;
     p.actCd = 0.8;
     this.emit({ k: 'hurdle', id: p.id });
   }
 
   // a leap: high and floaty, carrying the run-up's momentum (vy: a smaller hop)
-  doJump(p, vy = JUMP_VY) {
+  doJump(p, vy = this.air.jump) {
     if (!p || p.y > 0.01 || !p.upright || p.state === 'engaged' || p.actCd > 0) return;
-    p.setState('jump', (2 * vy) / AIR_GRAVITY);
+    p.setState('jump', (2 * vy) / this.air.g);
     p.vy = vy;
     p.actCd = 0.5;
     this.emit({ k: 'jump', id: p.id });
@@ -923,8 +933,8 @@ export class Play {
   leap(p) {
     const b = this.ball;
     const f = b.state === 'air' && b.f && b.f.kind === 'pass' && !b.f.resolved ? b.f : null;
-    const l = f ? leapFor(p, f) : null;
-    this.doJump(p, l ? l.vy : JUMP_VY);
+    const l = f ? leapFor(p, f, this.air) : null;
+    this.doJump(p, l ? l.vy : this.air.jump);
   }
 
   // Where a defender's dive should go: at a runner ahead of him, led to where the runner
@@ -942,7 +952,7 @@ export class Play {
       fx = p.vx / p.speed;
       fz = p.vz / p.speed;
     }
-    const T = DIVE_AIR * 0.85;
+    const T = this.air.diveAir * 0.85;
     const tx = c.x + c.vx * T;
     const tz = c.z + c.vz * T;
     const d = len(tx - p.x, tz - p.z);
@@ -964,7 +974,8 @@ export class Play {
       const d = len(dx, dz) || 1;
       fx = dx / d;
       fz = dz / d;
-      sp = T !== undefined ? clamp((d - 0.5) / clamp(T, 0.2, DIVE_AIR), 2.5, 10) : clamp(d / DIVE_AIR, 6.5, 11.5);
+      const DA = this.air.diveAir;
+      sp = T !== undefined ? clamp((d - 0.5) / clamp(T, 0.2, DA), 2.5, 10) : clamp(d / DA, 6.5 * this.pace, 11.5 * this.pace);
     } else if (p.speed > 1) {
       fx = p.vx / p.speed;
       fz = p.vz / p.speed;
@@ -972,9 +983,9 @@ export class Play {
     p.face = angleOf(fx, fz);
     p.vx = fx * sp;
     p.vz = fz * sp;
-    p.vy = DIVE_VY;
+    p.vy = this.air.dive;
     p.y = 0.02;
-    p.setState('dive', DIVE_AIR + DIVE_SLIDE);
+    p.setState('dive', this.air.diveAir + DIVE_SLIDE);
     p.actCd = 1.2;
     this.emit({ k: 'dive', id: p.id });
   }
@@ -1365,7 +1376,7 @@ export class Play {
     const cands = [];
     for (const p of this.players) {
       // a diving player is laid out low and long: more reach along the ground, none up high
-      const diving = p.state === 'dive' && p.st < DIVE_AIR + 0.06;
+      const diving = p.state === 'dive' && p.st < this.air.diveAir + 0.06;
       if ((!p.upright && !diving) || p.state === 'engaged' || p === f.thrower || f.tried.has(p.id)) continue;
       const reach = diving ? 1.7 : 2.45 + p.y + (p.state === 'jump' ? 0.3 : 0);
       if (b.y > reach) continue;
@@ -1876,7 +1887,7 @@ export class Play {
     }
     if (st === 'dive') {
       if (p.y > 0 || p.vy > 0) {
-        p.vy -= AIR_GRAVITY * dt;
+        p.vy -= this.air.g * dt;
         p.y += p.vy * dt;
         if (p.y <= 0) {
           // belly-flop into the turf
@@ -1909,7 +1920,7 @@ export class Play {
     }
     // ---- normal locomotion
     const human = this.isHuman(p);
-    let max = p.spd * (human ? 1 : p.lvl.speed);
+    let max = p.spd * this.pace * (human ? 1 : p.lvl.speed);
     const wantT = p.wantTurbo && this.turboAllowed(p);
     p.turboOn = wantT && len(p.ix, p.iz) > 0.3;
     if (p.turboOn) max *= TURBO_MULT;
@@ -1937,7 +1948,7 @@ export class Play {
     let az = tvz - p.vz;
     const al = len(ax, az);
     // the player you steer gets an arcade edge: quicker off the mark, stops and cuts on a dime
-    let acc = p.acc * (p.turboOn ? 1.2 : 1) * (human ? 1.5 : 1);
+    let acc = p.acc * this.pace * (p.turboOn ? 1.2 : 1) * (human ? 1.5 : 1);
     // little steering in the air: a leap carries the run-up's momentum
     if (p.y > 0) acc *= 0.35;
     if (p.vx * tvx + p.vz * tvz < 0) acc *= human ? 1.9 : 1.6;
@@ -1963,7 +1974,7 @@ export class Play {
     }
     // jumping
     if (p.y > 0 || p.vy > 0) {
-      p.vy -= AIR_GRAVITY * dt;
+      p.vy -= this.air.g * dt;
       p.y += p.vy * dt;
       if (p.y <= 0) {
         p.y = 0;
@@ -2029,7 +2040,7 @@ export class Play {
       let reach = d.r + c.r + 0.12;
       if (d.state === 'dive') {
         // laid out: the arms are well ahead of the hips, and the slide still trips a runner
-        if (d.st > DIVE_AIR + 0.12) continue;
+        if (d.st > this.air.diveAir + 0.12) continue;
         px += Math.sin(d.face) * 0.6;
         pz += Math.cos(d.face) * 0.6;
         reach += 0.45;

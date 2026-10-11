@@ -204,6 +204,16 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; color: var(--gold)
 .tblurb { font-size: 13px; color: rgba(255, 255, 255, 0.8); text-align: center; margin-top: 4px; }
 .setup .menu, .lobby .menu { min-width: min(520px, 92vw); }
 .setup-row { width: 100%; display: flex; gap: 26px; align-items: center; justify-content: center; flex-wrap: wrap; }
+/* the setup list is long (team, controls, rules, arcade feel): keep it inside short screens */
+@media (max-height: 820px) {
+  .setup .menu { gap: 5px; }
+  .setup .mi { padding-top: 6px; padding-bottom: 6px; font-size: 16px; }
+  .setup .screen-title { font-size: clamp(28px, 4.4vw, 44px); }
+}
+@media (max-height: 680px) {
+  .setup .mi { padding-top: 4px; padding-bottom: 4px; font-size: 15px; }
+  .setup .menu { gap: 4px; }
+}
 
 /* ------------------------------------------------------------ how to */
 .howto-cols { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 16px; width: min(1180px, 100%); }

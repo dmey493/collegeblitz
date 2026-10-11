@@ -300,3 +300,36 @@ test('a big hit or a sack earns a taunt once the play is dead', () => {
   }
   assert.ok(taunts >= 3, `taunts: ${taunts}`);
 });
+
+test('feel options: floatier jumps hang longer at the same height, more dives, faster pace', () => {
+  const leap = (hang) => {
+    const m = new Match({ teams: ['IND', 'MICH'], humans: [false, false], seed: 4, rules: { hang } });
+    m.poss = 0;
+    m.startPlay({ kind: 'scrimmage', off: 0, ballOn: 30, fdOn: 60, offPlayId: 'blast', defPlayId: 'safe' });
+    for (let i = 0; i < 60 * 6 && m.play.phase !== 'live'; i++) m.step(1 / 60);
+    const p = m.play.players.find((q) => q.slot === 'WR1' && q.team === 0);
+    m.play.doJump(p);
+    let top = 0;
+    let air = 0;
+    for (let i = 0; i < 200 && (p.y > 0 || p.vy > 0); i++) {
+      m.play.integrate(p, 1 / 60);
+      top = Math.max(top, p.y);
+      air += 1 / 60;
+    }
+    return { top, air };
+  };
+  const a = leap(1);
+  const b = leap(1.45);
+  assert.ok(Math.abs(a.top - b.top) < 0.05, `same height (${a.top} vs ${b.top})`);
+  assert.ok(b.air > a.air * 1.35, `longer hang (${a.air} vs ${b.air})`);
+  const dives = (mul) => {
+    const m = new Match({ teams: ['IND', 'MICH'], humans: [false, false], seed: 9, rules: { quarterSec: 60, dives: mul } });
+    let n = 0;
+    for (let i = 0; i < 60 * 60 * 15 && m.phase !== 'final'; i++) {
+      m.step(1 / 60);
+      for (const e of m.drainEvents()) if (e.k === 'dive') n++;
+    }
+    return n;
+  };
+  assert.ok(dives(2.5) > dives(0.5) * 1.5, 'more CPU dives');
+});

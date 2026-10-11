@@ -92,6 +92,9 @@ steering, the human QB takes his drop automatically.
   and eyes turn to a ball coming over a shoulder. Layouts are two-handed or one-handed on the
   side; flying tackles go in arms-wide or shoulder-first. The man who lays a big hit or gets a
   sack flexes or points down at his victim after the whistle.
+* The feel is tunable for vs-CPU games (match rules `hang`, `dives`, `pace`): hang time scales
+  leaps and dives at the same height (gravity / h², takeoff speed / h), dives scales how often
+  CPU defenders lay out, pace scales every player's top speed and acceleration.
 * Regular tackles are wrap-ups: the tackler latches on and both go down together the way he was
   driving, him on top. Blockers and rushers lock up with their hands on each other.
 * The camera rides a pass out, moves in tight on the catch and stays tight on the runner; after

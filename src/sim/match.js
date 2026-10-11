@@ -27,7 +27,9 @@ export class Match {
     this.teamIds = opts.teams || ['IND', 'MICH'];
     this.teams = this.teamIds.map((id) => TEAMS[id]);
     this.human = [...(opts.humans || [true, false])];
-    this.rules = { quarterSec: 120, fdYards: 30, ...(opts.rules || {}) };
+    // hang: how long leaps and dives stay in the air (same height), dives: how often CPU
+    // defenders lay out for a tackle, pace: player speed and quickness (all 1 = default)
+    this.rules = { quarterSec: 120, fdYards: 30, hang: 1, dives: 1, pace: 1, ...(opts.rules || {}) };
     this.difficulty = DIFFICULTY[opts.difficulty] ? opts.difficulty : 'varsity';
     this.seed = opts.seed ?? ((Math.random() * 2 ** 31) | 0);
     this.rng = makeRng(this.seed);
@@ -594,6 +596,7 @@ export class Match {
         t: round2(p.liveT),
         dir: p.dir,
         vd: p.viewDir,
+        ag: round2(p.air.g),
         los: round2(p.losZ),
         fd: p.fdZ === null ? null : round2(p.fdZ),
         off: p.off,

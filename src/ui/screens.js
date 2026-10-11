@@ -84,10 +84,14 @@ export function setupScreen({ settings, onStart, onBack, onControls, sfx }) {
     { label: 'QUARTER LENGTH', kind: 'select', options: [60, 90, 120, 180, 300].map((s) => ({ label: `${s / 60} MIN`.replace('1.5', '1:30'), value: s })), value: settings.quarterSec, onChange: (v) => (settings.quarterSec = v) },
     { label: 'FIRST DOWN', kind: 'select', options: [{ label: '30 YARDS', value: 30 }, { label: '25 YARDS', value: 25 }, { label: '10 YARDS (SIM)', value: 10 }], value: settings.fdYards, onChange: (v) => (settings.fdYards = v) },
     { label: 'CPU', kind: 'select', options: [{ label: 'ROOKIE', value: 'rookie' }, { label: 'VARSITY', value: 'varsity' }, { label: 'HEISMAN', value: 'heisman' }], value: settings.difficulty, onChange: (v) => (settings.difficulty = v) },
+    // arcade feel: tune it while you play
+    { label: 'JUMPS', kind: 'select', options: [{ label: 'SNAPPY', value: 0.85 }, { label: 'ARCADE', value: 1 }, { label: 'FLOATY', value: 1.2 }, { label: 'MOON', value: 1.45 }], value: settings.hang, onChange: (v) => (settings.hang = v) },
+    { label: 'CPU DIVES', kind: 'select', options: [{ label: 'FEWER', value: 0.5 }, { label: 'NORMAL', value: 1 }, { label: 'MORE', value: 1.6 }, { label: 'CONSTANT', value: 2.5 }], value: settings.dives, onChange: (v) => (settings.dives = v) },
+    { label: 'GAME SPEED', kind: 'select', options: [{ label: 'SLOWER', value: 0.9 }, { label: 'NORMAL', value: 1 }, { label: 'FASTER', value: 1.1 }, { label: 'TURBO', value: 1.2 }], value: settings.pace, onChange: (v) => (settings.pace = v) },
     { label: 'KICK OFF!', onPress: () => onStart({ ...settings, team: state.team }) },
     { label: 'BACK', onPress: onBack },
   ], { onBack, onMove: sfx.move, onSelect: sfx.select, className: 'setup-menu' });
-  menu.i = 6;
+  menu.i = 9;
   menu.paint();
   paintCards();
   const el = h('div.screen.setup', h('div.screen-title', 'CHOOSE YOUR STATE'), h('div.setup-row', cards, h('div.panel.narrow', menu.el, keysHelp)));

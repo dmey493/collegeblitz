@@ -108,6 +108,17 @@ layout under **SETTINGS → CONTROLS** (or on the vs-CPU setup screen).
   are on the ground for a second and a half.
 - Late hits after the whistle are legal.
 
+## Arcade feel (vs CPU)
+
+The setup screen has three dials for tuning how the game feels while you play:
+
+- **JUMPS**: how long leaps and flying tackles hang in the air (SNAPPY, ARCADE, FLOATY, MOON). The
+  height stays the same; only the hang time changes.
+- **CPU DIVES**: how often CPU defenders launch flying tackles (FEWER, NORMAL, MORE, CONSTANT).
+- **GAME SPEED**: everyone's top speed and quickness (SLOWER, NORMAL, FASTER, TURBO).
+
+Online games use the defaults.
+
 ## Rules (arcade)
 
 - 7 players a side, **4 downs to gain 30 yards** (25 or 10 selectable for vs CPU).

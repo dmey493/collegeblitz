@@ -23,6 +23,7 @@ const STORE = 'collegeblitz.settings.v1';
 function loadSettings() {
   const base = {
     sound: true, music: true, announcer: true, quality: 'high', quarterSec: 120, fdYards: 30, difficulty: 'varsity',
+    hang: 1, dives: 1, pace: 1,
     team: 'IND', name: 'PLAYER', server: defaultServerUrl(), keys: 'arrows', passing: 'icons', online: 'direct',
   };
   try {
@@ -329,7 +330,10 @@ class App {
     this.session = new LocalSession({
       teams: [mine, other],
       humanTeam: 0,
-      rules: { quarterSec: this.settings.quarterSec, fdYards: this.settings.fdYards },
+      rules: {
+        quarterSec: this.settings.quarterSec, fdYards: this.settings.fdYards,
+        hang: this.settings.hang, dives: this.settings.dives, pace: this.settings.pace,
+      },
       difficulty: this.settings.difficulty,
     });
     this.enterGame([TEAMS[mine], TEAMS[other]], 0);

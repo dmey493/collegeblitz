@@ -301,7 +301,7 @@ export class GameRenderer {
     this.time += dt;
     const live = view && view.snap && view.snap.pl;
     const seen = new Set();
-    const ctxAnim = { time: this.time, celebrateSeed: view && view.snap ? view.snap.n : 0 };
+    const ctxAnim = { time: this.time, celebrateSeed: view && view.snap ? view.snap.n : 0, airG: view && view.snap && view.snap.pl ? view.snap.pl.ag : 0 };
 
     if (ctx.mode === 'title') this.renderShowcase(dt, seen, ctxAnim);
     else if (live) {
