@@ -4,7 +4,7 @@
 import {
   HALF_W, GOAL, END, POST_Z, POST_HALF, CROSSBAR, GRAVITY, TURBO_MULT, TURBO_DRAIN, TURBO_REGEN,
   DEF_SLOTS, DIFFICULTY, TEAMMATE_LEVEL, dirOf,
-  AIR_GRAVITY, JUMP_VY, HURDLE_VY, DIVE_VY, DIVE_AIR, DIVE_SLIDE, HIT_GRAVITY, GETUP_TIME,
+  AIR_GRAVITY, JUMP_VY, HURDLE_VY, DIVE_VY, DIVE_AIR, DIVE_SLIDE, HIT_GRAVITY, GETUP_TIME, HIT_WINDOW,
 } from './constants.js';
 import { clamp, lerp, len, dist, turnToward, angleOf, wrapAngle } from './math.js';
 import { Player } from './player.js';
@@ -710,6 +710,7 @@ export class Play {
     this.resolveContacts();
     this.updateEngagements(dt);
     this.updateBall(dt);
+    if (this.phase === 'live') this.checkInterference();
     if (this.phase === 'live') this.checkTackles();
     if (this.phase === 'live') this.checkBounds();
     for (const p of this.players) {
@@ -940,8 +941,13 @@ export class Play {
   // Where a defender's dive should go: at a runner ahead of him, led to where the runner
   // will be when the dive comes down. null if nobody is in range.
   diveTarget(p) {
-    const c = this.ball.carrier;
-    if (!c || this.ball.state !== 'held' || c.team === p.team || !c.upright) return null;
+    let c = this.ball.carrier;
+    if (!c || this.ball.state !== 'held') {
+      // a pass in the air: lay out the receiver it's going to
+      const f = this.ball.state === 'air' && this.ball.f && this.ball.f.kind === 'pass' && !this.ball.f.resolved ? this.ball.f : null;
+      c = f ? f.intended : null;
+    }
+    if (!c || c.team === p.team || !c.upright) return null;
     let fx = Math.sin(p.face);
     let fz = Math.cos(p.face);
     const il = len(p.ix, p.iz);
@@ -2023,6 +2029,58 @@ export class Play {
   }
 
   // ------------------------------------------------------------- tackling
+  // No flags in this league: in the last moments before a pass arrives, a defender who dives
+  // into the receiver or runs through him on turbo flattens him, and the ball sails on (to be
+  // picked off, or to fall incomplete).
+  hitWindow(f) {
+    return f.T - f.t < HIT_WINDOW;
+  }
+
+  checkInterference() {
+    const b = this.ball;
+    const f = b.state === 'air' && b.f && b.f.kind === 'pass' && !b.f.resolved ? b.f : null;
+    const r = f && f.intended;
+    if (!r || !r.upright || r.state === 'engaged' || !this.hitWindow(f) || f.tried.has(r.id)) return;
+    for (const d of this.players) {
+      if (d.team === r.team || d.tackleCd > 0 || d.state === 'engaged') continue;
+      const diving = d.state === 'dive' && d.st < this.air.diveAir + 0.12;
+      // the turbo hit is the human's move (CPU defenders converging on the ball at turbo would
+      // otherwise flatten receivers by accident); the CPU lays receivers out with a dive
+      const closing = ((r.x - d.x) * d.vx + (r.z - d.z) * d.vz) / (len(r.x - d.x, r.z - d.z) || 1);
+      const hitting = d.upright && d.turboOn && closing > 5.5 && this.isHuman(d);
+      if (!diving && !hitting) continue;
+      let px = d.x;
+      let pz = d.z;
+      let reach = d.r + r.r + 0.1;
+      if (diving) {
+        px += Math.sin(d.face) * 0.6;
+        pz += Math.cos(d.face) * 0.6;
+        reach += 0.45;
+      }
+      if (len(px - r.x, pz - r.z) > reach) continue;
+      f.tried.add(r.id);
+      d.tackleCd = 0.6;
+      const hx = d.vx;
+      const hz = d.vz;
+      const hl = len(hx, hz) || 1;
+      r.fallFwd = Math.sin(r.face) * hx + Math.cos(r.face) * hz > 0;
+      r.vx = (hx / hl) * 3 + r.vx * 0.3;
+      r.vz = (hz / hl) * 3 + r.vz * 0.3;
+      this.releaseEngagement(r);
+      if (r.y > 0.3) {
+        // hit in the air: he goes for a ride
+        r.vy = Math.max(r.vy, 3);
+        r.setState('flying');
+      } else {
+        r.y = 0;
+        r.setState('down', 0.7);
+      }
+      if (!diving) d.setState('stumble', 0.3);
+      this.emit({ k: 'interference', id: r.id, by: d.id, dive: diving, x: Math.round(r.x * 10) / 10, z: Math.round(r.z * 10) / 10 });
+      return;
+    }
+  }
+
   checkTackles() {
     const c = this.ball.carrier;
     if (c && this.ball.state === 'held' && c.state === 'down') {

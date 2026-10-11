@@ -54,6 +54,7 @@ const CALLS = {
   nofg: ['No good!'],
   first: ['First down!'],
   late: ['Late hit!'],
+  noflag: ['No flag!', 'No flags in this league!', 'Interference? Not here!'],
   juke: ['Spin move!', 'Look at that move!'],
   grab: ['What a catch!', 'He went up and got it!', 'Unbelievable grab!'],
   layout: ['Diving catch!', 'He laid out for it!'],
@@ -480,6 +481,11 @@ class App {
         case 'lateHit':
           A.hit(true);
           say('late');
+          break;
+        case 'interference':
+          A.hit(false);
+          A.ooh();
+          if (Math.random() < 0.6) say('noflag');
           break;
         case 'throw':
           A.throwBall();

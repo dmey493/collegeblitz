@@ -73,6 +73,19 @@ function hawk(play, p) {
   uz /= ul;
   seek(p, f.tx + ux * 0.5, f.tz + uz * 0.5, 0.25);
   turbo(p, d > 1.5 && d < 5);
+  // no flags: with the ball about to arrive and no play on it, take out the receiver
+  const r = f.intended;
+  if (r && r.team !== p.team && r.upright && p.upright && p.y === 0 && p.actCd <= 0 && play.hitWindow(f)) {
+    const T = play.air.diveAir * 0.7;
+    const rx = r.x + r.vx * T;
+    const rz = r.z + r.vz * T;
+    const dr = len(rx - p.x, rz - p.z);
+    const mine = d < 1.2 && tLeft < 0.45;
+    if (!mine && dr > 1.2 && dr < 3.4 && play.rng() < (p.lvl.dive * play.diveMul * 1.6) / 60) {
+      play.doDive(p, rx, rz);
+      return true;
+    }
+  }
   maybeJumpForBall(play, p);
   return true;
 }

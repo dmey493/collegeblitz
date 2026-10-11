@@ -106,6 +106,9 @@ layout under **SETTINGS → CONTROLS** (or on the vs-CPU setup screen).
 - **Defense:** Pass switches to the defender nearest the ball, Jump to leap and swat, Spin for a
   flying tackle: it homes in on a runner ahead of you from up to about five yards. Miss and you
   are on the ground for a second and a half.
+- **No flags:** in the last second before a pass arrives you can take the receiver out: Spin to
+  dive into him (it aims at him) or run him over on turbo. He goes down and can't catch it. Hit
+  him any earlier and you just bump off him. The CPU will do it to you too.
 - Late hits after the whistle are legal.
 
 ## Arcade feel (vs CPU)
@@ -122,7 +125,8 @@ Online games use the defaults.
 ## Rules (arcade)
 
 - 7 players a side, **4 downs to gain 30 yards** (25 or 10 selectable for vs CPU).
-- No penalties. Ball always spotted in the middle of the field.
+- No penalties, so no pass interference either (see No flags above). Ball always spotted in the
+  middle of the field.
 - TD 6, kick for 1 or go for 2 from the 3, FG 3, safety 2. Kickoffs and punts are live.
 - 3 straight completions or 2 straight sacks put a team **ON FIRE** (unlimited turbo).
 - Tied after regulation → college overtime from the 25.

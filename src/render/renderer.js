@@ -230,6 +230,11 @@ export class GameRenderer {
           }
           break;
         }
+        case 'interference':
+          // no flags: the receiver gets flattened before the ball arrives
+          this.effects.impact(e.x, 1.1, e.z, false);
+          this.director.kick(0.35);
+          break;
         case 'lateHit':
           this.effects.impact(e.x, 1, e.z, true);
           this.director.kick(0.5);

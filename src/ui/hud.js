@@ -153,6 +153,9 @@ export class HUD {
         case 'lateHit':
           this.popup('LATE HIT!', 'hot');
           break;
+        case 'interference':
+          this.popup('NO FLAG!', 'hot');
+          break;
         case 'whistle':
           if (e.type === 'touchback') this.callout('TOUCHBACK', '', 'white', 1.4);
           break;

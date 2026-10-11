@@ -27,6 +27,9 @@ export const HIT_GRAVITY = 20; // a runner blown up by a big hit
 // Getting up off the turf (motion captured). Time spent lying down is shorter by as much as
 // this grew, so a downed player is out of the play as long as before.
 export const GETUP_TIME = 0.85;
+// No flags: in the last moments before a pass arrives a defender may flatten the receiver
+// (a dive, or a turbo hit). Earlier contact just bumps, so receivers can't be mugged off the line.
+export const HIT_WINDOW = 0.9;
 
 export const TURBO_MULT = 1.25;
 export const TURBO_DRAIN = 0.42; // per second while burning

@@ -333,3 +333,57 @@ test('feel options: floatier jumps hang longer at the same height, more dives, f
   };
   assert.ok(dives(2.5) > dives(0.5) * 1.5, 'more CPU dives');
 });
+
+test('no flags: a dive into the receiver just before the ball arrives flattens him', () => {
+  const setup = (deep = 0) => {
+    const m = new Match({ teams: ['IND', 'MICH'], humans: [false, false], seed: 12 });
+    m.poss = 0;
+    m.startPlay({ kind: 'scrimmage', off: 0, ballOn: 30, fdOn: 60, offPlayId: 'curls', defPlayId: 'safe' });
+    const play = m.play;
+    for (let i = 0; i < 60 * 6 && play.phase !== 'live'; i++) m.step(1 / 60);
+    const qb = play.players.find((q) => q.slot === 'QB' && q.team === 0);
+    const rec = play.players.find((q) => q.slot === 'WR1' && q.team === 0);
+    for (let i = 0; i < 40 && play.ball.carrier !== qb; i++) m.step(1 / 60);
+    rec.z += play.dir * deep;
+    play.throwPass(qb, rec, false);
+    const lb = play.players.find((q) => q.slot === 'LB1' && q.team === 1);
+    return { m, play, rec, lb };
+  };
+  // the ball is almost there: the hit lands
+  {
+    const { m, play, rec, lb } = setup();
+    const f = play.ball.f;
+    while (!play.hitWindow(f)) m.step(1 / 60);
+    lb.x = rec.x - 2 * Math.sin(rec.face);
+    lb.z = rec.z - 2 * Math.cos(rec.face);
+    lb.setState('stand');
+    lb.actCd = 0;
+    lb.vx = 0;
+    lb.vz = 0;
+    play.doDive(lb, rec.x, rec.z);
+    let hit = false;
+    for (let i = 0; i < 30 && play.phase === 'live'; i++) {
+      m.step(1 / 60);
+      if (m.drainEvents().some((e) => e.k === 'interference')) hit = true;
+    }
+    assert.ok(hit, 'the receiver is laid out');
+    assert.ok(!rec.upright || rec.state === 'getup', 'and is on the ground');
+    assert.ok(play.ball.carrier !== rec, 'so he can not catch it');
+  }
+  // the ball has only just been thrown: contact is just a bump
+  {
+    const { m, play, rec, lb } = setup(45);
+    assert.ok(!play.hitWindow(play.ball.f));
+    lb.x = rec.x - 2 * Math.sin(rec.face);
+    lb.z = rec.z - 2 * Math.cos(rec.face);
+    lb.setState('stand');
+    lb.actCd = 0;
+    play.doDive(lb, rec.x, rec.z);
+    let hit = false;
+    for (let i = 0; i < 12; i++) {
+      m.step(1 / 60);
+      if (m.drainEvents().some((e) => e.k === 'interference')) hit = true;
+    }
+    assert.ok(!hit && rec.upright, 'too early: no knockdown');
+  }
+});

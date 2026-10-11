@@ -95,6 +95,11 @@ steering, the human QB takes his drop automatically.
 * The feel is tunable for vs-CPU games (match rules `hang`, `dives`, `pace`): hang time scales
   leaps and dives at the same height (gravity / h², takeoff speed / h), dives scales how often
   CPU defenders lay out, pace scales every player's top speed and acceleration.
+* No flags: in the last 0.9 s before a pass arrives (HIT_WINDOW) a defender who dives into the
+  intended receiver, or a human-controlled defender who runs through him on turbo, flattens him
+  (a receiver in the air is blown up) and the ball sails on, incomplete or there to be picked
+  off. Earlier contact only bumps. CPU defenders breaking on the ball dive at the receiver when
+  they can't make a play on the ball (scaled by the CPU DIVES dial).
 * Regular tackles are wrap-ups: the tackler latches on and both go down together the way he was
   driving, him on top. Blockers and rushers lock up with their hands on each other.
 * The camera rides a pass out, moves in tight on the catch and stays tight on the runner; after
