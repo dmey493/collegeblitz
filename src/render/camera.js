@@ -1,6 +1,6 @@
 // Blitz-style camera: always behind the offense, high and tight, pulling back on deep balls.
 import * as THREE from 'three';
-import { HALF_W } from '../sim/constants.js';
+import { HALF_W, VIEW_TURN } from '../sim/constants.js';
 
 const damp = (k, dt) => 1 - Math.exp(-k * dt);
 
@@ -41,7 +41,9 @@ export class CameraDirector {
       const pl = s.pl;
       // the sim's view direction: behind the offense, swinging around behind whoever has the
       // ball after a turnover or on a return (the controls follow the same direction)
-      const dir = pl ? pl.vd || pl.dir : s.pos === 0 ? 1 : -1;
+      // the way the view faces: behind the offense, then behind whoever has the ball after a
+      // turnover or on a return (the camera swings round to it, see below)
+      const dir = pl ? pl.vt || pl.vd || pl.dir : s.pos === 0 ? 1 : -1;
       const losZ = pl ? pl.los : dir * (s.on - 50);
       const b = view.ball;
       if (!pl || pl.ph === 'lineup' || pl.ph === 'presnap' || s.ph !== 'play') {
@@ -115,13 +117,35 @@ export class CameraDirector {
         }
       }
     }
-    // the view flipped (turnover, return): cut to the reverse angle instead of swooping
-    const vd = s && s.pl ? s.pl.vd || s.pl.dir : 0;
-    const cut = !this.override && vd && this.lastVd && vd !== this.lastVd && s.pl.ph === 'live';
-    this.lastVd = vd;
-    if (cut && pos && look) {
-      this.pos.copy(pos);
-      this.look.copy(look);
+    // the view flipped (turnover, return): swing round the ball carrier to the new side
+    const vt = s && s.pl ? s.pl.vt || s.pl.vd || s.pl.dir : 0;
+    if (!this.override && vt && this.lastVt && vt !== this.lastVt && s.pl && (s.pl.ph === 'live' || s.pl.ph === 'dead')) {
+      const f = view.ball || { x: 0, z: 0 };
+      // go round the side nearer the middle of the field, so the camera stays over the field
+      this.turn = { t: 0, sign: (f.x >= 0 ? 1 : -1) * vt };
+    }
+    this.lastVt = vt;
+    if (this.turn && pos && look && !this.override) {
+      this.turn.t += dt;
+      const k = Math.min(1, this.turn.t / VIEW_TURN);
+      const e = k * k * (3 - 2 * k);
+      const ang = (1 - e) * Math.PI * this.turn.sign;
+      const f = view.ball || { x: pos.x, z: pos.z };
+      const c = Math.cos(ang);
+      const sn = Math.sin(ang);
+      const rot = (v) => {
+        const dx = v.x - f.x;
+        const dz = v.z - f.z;
+        v.x = f.x + dx * c - dz * sn;
+        v.z = f.z + dx * sn + dz * c;
+      };
+      rot(pos);
+      rot(look);
+      pos.y += Math.sin(e * Math.PI) * 2.2; // a little lift through the swing
+      // follow the orbit exactly: smoothing would cut straight across it
+      kp = 1e3;
+      kl = 1e3;
+      if (k >= 1) this.turn = null;
     }
     if (this.override) {
       // fixed camera for close-ups and screenshots: { pos: [x, y, z], look: [x, y, z] }

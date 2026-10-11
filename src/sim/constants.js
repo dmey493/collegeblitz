@@ -30,6 +30,9 @@ export const GETUP_TIME = 0.85;
 // No flags, as in the arcade original: while a pass is in the air a defender may flatten the
 // receiver (a dive, or a turbo hit). CPU defenders wait until this close to the catch to do it.
 export const CPU_HIT_TIME = 0.9;
+// When the ball changes hands the camera swings around behind the new carrier over this long;
+// the stick's directions flip halfway through, when the view is side-on.
+export const VIEW_TURN = 0.8;
 
 export const TURBO_MULT = 1.25;
 export const TURBO_DRAIN = 0.42; // per second while burning

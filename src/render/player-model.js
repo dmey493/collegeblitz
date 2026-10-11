@@ -158,7 +158,7 @@ const basePose = () => ({
 
 // Players are drawn larger than life (the arcade look): every model is scaled up from its
 // real-world proportions. The game itself (positions, collisions, jump heights) is unchanged.
-export const PLAYER_SCALE = 1.3;
+export const PLAYER_SCALE = 1.45;
 
 export class PlayerModel {
   constructor({ team, num, body, slot, id, envMap }) {

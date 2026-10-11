@@ -596,6 +596,7 @@ export class Match {
         t: round2(p.liveT),
         dir: p.dir,
         vd: p.viewDir,
+        vt: p.viewTarget,
         ag: round2(p.air.g),
         los: round2(p.losZ),
         fd: p.fdZ === null ? null : round2(p.fdZ),

@@ -268,15 +268,24 @@ test('after a turnover the screen and the stick both face the new ball carrier',
   play.ball.f = { kind: 'pass', resolved: false };
   play.intercept(lb);
   play.ctrl[1] = lb;
-  const z0 = lb.z;
   const inp = { mx: 0, my: 1, turbo: false, a: 0, j: 0, s: 0, c0: 0, c1: 0, c2: 0 };
-  for (let i = 0; i < 40 && play.phase === 'live'; i++) {
+  m.setInput(1, inp);
+  m.step(1 / 60);
+  assert.equal(play.viewTarget, -1, 'the camera starts swinging round behind the interceptor');
+  assert.equal(play.viewDir, 1, 'the stick keeps its old directions for the first half of the turn');
+  for (let i = 0; i < 30 && play.viewDir === 1; i++) {
     m.setInput(1, inp);
     m.step(1 / 60);
   }
-  assert.equal(play.viewDir, -1, 'the view swings behind the interceptor');
-  assert.ok(lb.z < z0 - 0.5, `pushing up runs him toward his own goal line direction (${lb.z} vs ${z0})`);
+  assert.equal(play.viewDir, -1, 'and flips halfway round');
+  const z0 = lb.z;
+  for (let i = 0; i < 30 && play.phase === 'live'; i++) {
+    m.setInput(1, inp);
+    m.step(1 / 60);
+  }
+  assert.ok(lb.z < z0 - 0.5, `pushing up runs him the way he is going (${lb.z} vs ${z0})`);
   assert.equal(m.snapshot().pl.vd, -1);
+  assert.equal(m.snapshot().pl.vt, -1);
 });
 
 test('a big hit or a sack earns a taunt once the play is dead', () => {

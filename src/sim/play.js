@@ -4,7 +4,7 @@
 import {
   HALF_W, GOAL, END, POST_Z, POST_HALF, CROSSBAR, GRAVITY, TURBO_MULT, TURBO_DRAIN, TURBO_REGEN,
   DEF_SLOTS, DIFFICULTY, TEAMMATE_LEVEL, dirOf,
-  AIR_GRAVITY, JUMP_VY, HURDLE_VY, DIVE_VY, DIVE_AIR, DIVE_SLIDE, HIT_GRAVITY, GETUP_TIME,
+  AIR_GRAVITY, JUMP_VY, HURDLE_VY, DIVE_VY, DIVE_AIR, DIVE_SLIDE, HIT_GRAVITY, GETUP_TIME, VIEW_TURN,
 } from './constants.js';
 import { clamp, lerp, len, dist, turnToward, angleOf, wrapAngle } from './math.js';
 import { Player } from './player.js';
@@ -33,6 +33,8 @@ export class Play {
     // the way the screen faces: behind the offense, then behind whoever has the ball after a
     // turnover or on a return (the camera follows it and the controls are screen-relative)
     this.viewDir = this.dir;
+    this.viewTarget = this.dir; // where the camera is turning to
+    this.viewTurnT = 0;
     // arcade feel from the match rules: a longer hang keeps the same height (lower gravity,
     // softer takeoff), pace scales everyone's speed and quickness
     const R = match.rules || {};
@@ -244,7 +246,8 @@ export class Play {
     const toGoal = 100 - this.ballOn;
     let land = Math.min(this.rng.range(38, 47), toGoal - 7);
     land = Math.max(land, 14);
-    this.kickInfo = { landDz: land, landDx: this.rng.range(-6, 6), hang: this.rng.range(3.7, 4.2), apex: this.rng.range(16, 20) };
+    // arcade punts are low line drives: the returner has the ball before the coverage arrives
+    this.kickInfo = { landDz: land, landDx: this.rng.range(-6, 6), hang: this.rng.range(2.5, 2.9), apex: this.rng.range(9, 12) };
     const maxDz = this.maxDz();
     this.setHome(d.DL1, [-2.2, 1.0]);
     this.setHome(d.DL2, [2.2, 1.0]);
@@ -696,7 +699,8 @@ export class Play {
   stepLive(dt, inputs) {
     this.liveT += dt;
     const b = this.ball;
-    if (b.state === 'held' && b.carrier) this.viewDir = dirOf(b.carrier.team);
+    if (b.state === 'held' && b.carrier) this.viewTarget = dirOf(b.carrier.team);
+    this.updateView(dt);
     this.updateControl(inputs);
     this.updateScripts(dt);
     if (this.t >= this.nextBlockAssign) {
@@ -718,6 +722,16 @@ export class Play {
       p.actCd = Math.max(0, p.actCd - dt);
       p.burst = Math.max(0, p.burst - dt);
     }
+  }
+
+  // the controls turn with the camera: flip them once it has swung halfway round
+  updateView(dt) {
+    if (this.viewTarget === this.viewDir) {
+      this.viewTurnT = 0;
+      return;
+    }
+    this.viewTurnT += dt;
+    if (this.viewTurnT >= VIEW_TURN * 0.5) this.viewDir = this.viewTarget;
   }
 
   isHuman(p) {
@@ -1031,7 +1045,7 @@ export class Play {
       if (b.state === 'held' && b.carrier && b.carrier.slot === 'QB' && !this.carrierRunning && this.dir * (b.carrier.z - this.losZ) > 0.5) this.reveal();
     } else if (this.kind === 'punt') {
       const k = o.K;
-      if (b.state === 'held' && b.carrier === k && !b.kicked && this.liveT > (k.jd.gotAt || 0) + 0.55) this.kickPunt(k);
+      if (b.state === 'held' && b.carrier === k && !b.kicked && this.liveT > (k.jd.gotAt || 0) + 0.3) this.kickPunt(k);
       if (b.kicked && this.liveT > this.kickT + 0.1) this.releaseKickControl();
     } else if (this.kind === 'fg' || this.kind === 'pat') {
       const h = o.QB;
@@ -2294,6 +2308,7 @@ export class Play {
   // ------------------------------------------------------------- after the whistle
   stepDead(dt, inputs) {
     this.deadT += dt;
+    this.updateView(dt);
     const res = this.result;
     for (const p of this.players) {
       p.humanDriven = false;
