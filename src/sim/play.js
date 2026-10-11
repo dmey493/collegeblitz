@@ -1256,9 +1256,14 @@ export class Play {
     const tz = P.z + this.rng.gauss() * sigma;
     const apex = bullet ? 0.35 + d * 0.034 : 0.6 + d * 0.088;
     const hand = { x: qb.x + Math.cos(qb.face) * 0.3, z: qb.z - Math.sin(qb.face) * 0.3 };
-    // lobs and balls into coverage go up high, where only a leaping receiver gets them
+    // Where it comes down. Like the arcade game, most passes come in high, over the receiver's
+    // reach, so he has to go up and get it (deeper and into coverage, higher still); now and then
+    // one is low and away, for a diving grab. Bullets come in at the head.
     const covered = this.players.some((q) => q.team !== qb.team && q.upright && len(q.x - P.x, q.z - P.z) < 2.5);
-    const ty = 1.35 + (bullet ? 0 : clamp((d - 8) * 0.04, 0, 0.8) + (covered ? 0.35 : 0)) + this.rng() * 0.3;
+    let ty;
+    if (bullet) ty = 1.55 + this.rng() * 0.45;
+    else if (d > 6 && this.rng() < 0.18) ty = 0.9 + this.rng() * 0.5;
+    else ty = 2.45 + clamp((d - 8) * 0.04, 0, 0.6) + (covered ? 0.3 : 0) + this.rng() * 0.45;
     this.flight({ kind: 'pass', fx: hand.x, fy: 2.1, fz: hand.z, tx, ty, tz, T, apex, intended: rec, bullet, thrower: qb });
     this.passThrown = true;
     this.passer = qb;

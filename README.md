@@ -103,8 +103,10 @@ team select, which also shows the current buttons as keycaps so you know them be
   PASS** for the classic style: steer toward a receiver to highlight him, then press Pass.
 - **Ball carrier:** Spin to juke, Pass to stiff-arm, Jump to hurdle.
 - **Receiver with the ball in the air:** he runs to the ball himself (the stick doesn't steer him
-  until he has it). Jump to go up for it (the leap is sized to meet the ball), Spin to lay out for
-  it (a diving catch is down where it lands).
+  until he has it). Like the arcade original, most passes come in over his reach: he goes up and
+  takes it over his head at the top of the leap, on his own if you don't press Jump first (Jump
+  times the leap yourself). Now and then one comes in low and away: Spin to lay out for it (a
+  diving catch is down where it lands).
 - **Defense:** Pass switches to the defender nearest the ball, Jump to leap and swat, Spin for a
   flying tackle: it homes in on a runner ahead of you from up to about five yards. Miss and you
   are on the ground for a second and a half.

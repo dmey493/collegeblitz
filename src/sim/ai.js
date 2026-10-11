@@ -95,18 +95,25 @@ const ballAt = (f, s) => ({ x: lerp(f.fx, f.tx, s), y: lerp(f.fy, f.ty, s) + 4 *
 // Go up for the ball: leap so the top of the jump meets it. Looks ahead for a leap (its
 // height sets its timing) that puts the ball in the hands at the top of it; receivers take
 // almost every such ball, defenders go up to knock it away. Decided once per throw.
-export function leapFor(p, f, air) {
+// The arcade grab is up over the head at full stretch: a leap that meets the ball there wins,
+// the bigger the better. Only when the ball is nearly there and no such leap is left does he
+// settle for one that takes it at the chest (`late`).
+export function leapFor(p, f, air, late = true) {
   const G = air.g;
+  let best = null;
   for (let tau = air.jump / G; tau >= 0.2; tau -= 0.025) {
     const s = (f.t + tau) / f.T;
     if (s > 1.2) continue;
     const at = ballAt(f, s);
     const H = 0.5 * G * tau * tau;
-    if (at.y < H + 1.25 || at.y > H + 2.65) continue;
+    // how high the ball is over his feet at the top of the leap
+    const rel = at.y - H;
+    if (rel < (late ? 1.25 : 2.0) || rel > 2.65) continue;
     if (len(at.x - (p.x + p.vx * tau), at.z - (p.z + p.vz * tau)) > 1.0) continue;
-    return { vy: G * tau, at };
+    const score = Math.abs(rel - 2.3) - 0.3 * H;
+    if (!best || score < best.score) best = { vy: G * tau, at, score };
   }
-  return null;
+  return best && { vy: best.vy, at: best.at };
 }
 
 function maybeJumpForBall(play, p) {
@@ -114,13 +121,15 @@ function maybeJumpForBall(play, p) {
   if (b.state !== 'air' || !b.f || b.f.kind !== 'pass' || b.f.resolved || p.y > 0 || p.actCd > 0 || !p.upright) return;
   const f = b.f;
   if (f.T - f.t > 0.75) return;
-  const leap = leapFor(p, f, play.air);
+  // hold out for the overhead grab until the ball is almost there
+  const leap = leapFor(p, f, play.air, f.T - f.t < 0.3);
   if (!leap) return;
   if (p.leapFor !== f) {
     p.leapFor = f;
     const mine = f.intended === p;
     const contested = play.players.some((q) => q.team !== p.team && q.upright && len(q.x - leap.at.x, q.z - leap.at.z) < 1.8);
-    const chance = mine ? (leap.at.y > 2.3 || contested ? 0.95 : 0.7) : contested ? 0.8 : 0.3;
+    // a ball over his reach: he always goes up for it
+    const chance = mine ? (leap.at.y > 2.4 ? 1 : contested ? 0.95 : 0.7) : contested ? 0.8 : 0.3;
     p.leapGo = play.rng() < chance;
   }
   if (p.leapGo) play.doJump(p, leap.vy);

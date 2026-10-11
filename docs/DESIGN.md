@@ -65,7 +65,9 @@ After a throw your control moves to the intended receiver, but while the ball is
 runs to it on his own: the stick only takes over once he has caught it. **Jump** and **Spin**
 still act on him, so a well-timed leap or layout is yours.
 Receiver: **Jump** to go up for the ball (with a pass in the air the leap is sized so its top
-meets the ball), **Spin = diving catch** (paced to meet the ball; down where you land).
+meets the ball up over his head, at full stretch), **Spin = diving catch** (paced to meet the ball;
+down where you land). Most passes come in above a standing receiver's reach, so catches are
+leaping grabs (about 4 in 5 in CPU games); bullets come in at the head and some lobs low and away.
 Defender: **Spin = flying tackle** (homes in on a runner ahead of you, up to ~5 yards out),
 **Jump = leap for the ball**, **Pass = switch to the man nearest the ball**. With nobody
 steering, the human QB takes his drop automatically.
