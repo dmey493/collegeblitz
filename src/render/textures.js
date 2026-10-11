@@ -373,6 +373,187 @@ export function labelTexture(text, color, bg = 'rgba(0,0,0,0)') {
   return tex(c, { aniso: 1 });
 }
 
+// --------------------------------------------------------------- uniforms
+// One texture per player covers everything made of cloth. The player geometry
+// maps each body part into its own rectangle of this atlas (uv, v = 0 at the bottom).
+export const ATLAS = {
+  torso: { u0: 0, v0: 0.5, u1: 1, v1: 1 },
+  sleeve: { u0: 0, v0: 0.25, u1: 0.5, v1: 0.5 },
+  cap: { u0: 0.5, v0: 0.25, u1: 0.75, v1: 0.5 },
+  pelvis: { u0: 0.75, v0: 0.25, u1: 1, v1: 0.5 },
+  thigh: { u0: 0, v0: 0, u1: 0.5, v1: 0.25 },
+  sock: { u0: 0.5, v0: 0, u1: 1, v1: 0.25 },
+};
+// Where the jersey numbers sit on the torso, in the torso region's own 0..1 space.
+// The torso wraps with the front at u = 0.75 and the back at u = 0.25.
+export const TORSO_MARKS = { front: { u: 0.75, v: 0.52, h: 0.3 }, back: { u: 0.25, v: 0.56, h: 0.36 } };
+
+function fabricNoise(g, x, y, w, h, seed, amt = 0.05) {
+  const r = srand(seed);
+  const n = Math.round((w * h) / 22);
+  for (let i = 0; i < n; i++) {
+    const v = r();
+    g.fillStyle = v < 0.5 ? `rgba(0,0,0,${amt * r()})` : `rgba(255,255,255,${amt * 0.7 * r()})`;
+    g.fillRect(x + r() * w, y + r() * h, 1.5, 1.5);
+  }
+}
+
+function drawNumber(g, text, cx, cy, height, fill, outline, squeeze = 0.62) {
+  g.save();
+  g.translate(cx, cy);
+  g.scale(squeeze, 1);
+  g.font = `800 ${Math.round(height * 1.36)}px ${FONT}`;
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.lineJoin = 'round';
+  g.lineWidth = height * 0.16;
+  g.strokeStyle = outline;
+  g.strokeText(text, 0, height * 0.06);
+  g.fillStyle = fill;
+  g.fillText(text, 0, height * 0.06);
+  g.restore();
+}
+
+const uniformCache = new Map();
+export function uniformTexture(team, num, size = 512) {
+  const key = `${team.id}-${num}-${size}`;
+  if (uniformCache.has(key)) return uniformCache.get(key);
+  const S = size;
+  const c = canvas(S, S);
+  const g = c.getContext('2d');
+  const C = team.colors;
+  const box = (R) => ({ x: R.u0 * S, y: (1 - R.v1) * S, w: (R.u1 - R.u0) * S, h: (R.v1 - R.v0) * S });
+  const at = (b, u, v) => [b.x + u * b.w, b.y + (1 - v) * b.h];
+  const band = (b, v0, v1, color) => {
+    g.fillStyle = color;
+    g.fillRect(b.x, b.y + (1 - v1) * b.h, b.w, (v1 - v0) * b.h);
+  };
+  const col = (b, u0, u1, color) => {
+    g.fillStyle = color;
+    g.fillRect(b.x + u0 * b.w, b.y, (u1 - u0) * b.w, b.h);
+  };
+  const trim = C.light === '#FFFFFF' ? '#ffffff' : C.light;
+  const s = String(num);
+
+  // torso
+  const T = box(ATLAS.torso);
+  g.fillStyle = C.jersey;
+  g.fillRect(T.x, T.y, T.w, T.h);
+  // a little shading baked in: darker toward the tuck, lighter across the chest
+  const sh = g.createLinearGradient(0, T.y, 0, T.y + T.h);
+  sh.addColorStop(0, 'rgba(255,255,255,0.0)');
+  sh.addColorStop(0.45, 'rgba(255,255,255,0.05)');
+  sh.addColorStop(1, 'rgba(0,0,0,0.22)');
+  g.fillStyle = sh;
+  g.fillRect(T.x, T.y, T.w, T.h);
+  band(T, 0.986, 1, trim); // collar
+  band(T, 0.978, 0.986, C.dark);
+  for (const [k, sq] of [['front', 0.6], ['back', 0.66]]) {
+    const m = TORSO_MARKS[k];
+    const [x, y] = at(T, m.u, m.v);
+    drawNumber(g, s, x, y, m.h * T.h, C.number, C.numberOutline, sq * (s.length > 1 ? 1 : 1.15));
+  }
+  fabricNoise(g, T.x, T.y, T.w, T.h, num * 13 + 1);
+
+  // sleeves: jersey color with two stripes near the hem
+  const SL = box(ATLAS.sleeve);
+  g.fillStyle = C.jersey;
+  g.fillRect(SL.x, SL.y, SL.w, SL.h);
+  band(SL, 0, 0.1, C.dark);
+  band(SL, 0.2, 0.32, C.sleeve);
+  band(SL, 0.42, 0.54, C.sleeve);
+  fabricNoise(g, SL.x, SL.y, SL.w, SL.h, num * 13 + 2);
+
+  // shoulder caps: TV number on the outside
+  const CP = box(ATLAS.cap);
+  g.fillStyle = C.jersey;
+  g.fillRect(CP.x, CP.y, CP.w, CP.h);
+  {
+    const [x, y] = at(CP, 0.5, 0.36);
+    drawNumber(g, s, x, y, CP.h * 0.2, C.number, C.numberOutline, 0.7);
+  }
+
+  // pants: belt + side stripes
+  const PV = box(ATLAS.pelvis);
+  g.fillStyle = C.pants;
+  g.fillRect(PV.x, PV.y, PV.w, PV.h);
+  col(PV, 0, 0.035, C.pantsStripe);
+  col(PV, 0.965, 1, C.pantsStripe);
+  col(PV, 0.465, 0.535, C.pantsStripe);
+  band(PV, 0.74, 1, '#17181c');
+  band(PV, 0.74, 0.76, 'rgba(255,255,255,0.18)');
+  fabricNoise(g, PV.x, PV.y, PV.w, PV.h, num * 13 + 3, 0.04);
+  const TH = box(ATLAS.thigh);
+  g.fillStyle = C.pants;
+  g.fillRect(TH.x, TH.y, TH.w, TH.h);
+  // the stripe runs down the outside of each leg (u = 0 / 1 is the outside)
+  col(TH, 0, 0.03, C.pantsStripe);
+  col(TH, 0.97, 1, C.pantsStripe);
+  const kn = g.createLinearGradient(0, TH.y + TH.h, 0, TH.y);
+  kn.addColorStop(0, 'rgba(0,0,0,0.18)');
+  kn.addColorStop(0.12, 'rgba(0,0,0,0.0)');
+  kn.addColorStop(1, 'rgba(0,0,0,0.0)');
+  g.fillStyle = kn;
+  g.fillRect(TH.x, TH.y, TH.w, TH.h);
+  fabricNoise(g, TH.x, TH.y, TH.w, TH.h, num * 13 + 4, 0.04);
+
+  // socks: two stripes up top, white tape around the ankle
+  const SK = box(ATLAS.sock);
+  g.fillStyle = C.socks;
+  g.fillRect(SK.x, SK.y, SK.w, SK.h);
+  band(SK, 0.7, 0.78, trim);
+  band(SK, 0.84, 0.92, trim);
+  band(SK, 0, 0.22, '#f3f3f1');
+  band(SK, 0.2, 0.23, 'rgba(0,0,0,0.12)');
+
+  const t = tex(c, { aniso: 4 });
+  uniformCache.set(key, t);
+  return t;
+}
+
+// Helmet shell texture. The shell maps u = azimuth (front at 0.5, back at 0 / 1)
+// and v = 1 - polar / HELMET_PHI (top of the helmet at v = 1).
+export const HELMET_PHI = 2.3;
+const helmetCache = new Map();
+export function helmetTexture(team, R = 0.172) {
+  if (helmetCache.has(team.id)) return helmetCache.get(team.id);
+  const W = 1024;
+  const H = 512;
+  const c = canvas(W, H);
+  const g = c.getContext('2d');
+  const C = team.colors;
+  g.fillStyle = C.helmet;
+  g.fillRect(0, 0, W, H);
+  // center stripe over the top: constant physical width, so it widens in u toward the pole
+  const stripe = (width, color, uC) => {
+    g.fillStyle = color;
+    for (let y = 0; y < H; y++) {
+      const phi = ((y + 0.5) / H) * HELMET_PHI;
+      const hw = Math.min(0.26, width / (2 * Math.PI * R * Math.max(0.02, Math.sin(phi))) / 2);
+      for (const u of [uC, uC - 1, uC + 1]) g.fillRect((u - hw) * W, y, hw * 2 * W, 1);
+    }
+  };
+  stripe(0.085, C.dark, 0.5);
+  stripe(0.085, C.dark, 0);
+  stripe(0.06, C.helmetStripe, 0.5);
+  stripe(0.06, C.helmetStripe, 0);
+  // state decal on both sides, never mirrored
+  const decalPhi = 1.42;
+  const physical = 0.15;
+  const du = physical / (2 * Math.PI * R * Math.sin(decalPhi));
+  const dv = physical / R / HELMET_PHI;
+  const dw = du * W;
+  const dh = dv * H;
+  const tmp = canvas(256, 256);
+  drawStateLogo(tmp.getContext('2d'), team, 256, { shadow: false });
+  for (const u of [0.25, 0.75]) {
+    g.drawImage(tmp, u * W - dw / 2, (decalPhi / HELMET_PHI) * H - dh / 2, dw, dh);
+  }
+  const t = tex(c, { aniso: 8 });
+  helmetCache.set(team.id, t);
+  return t;
+}
+
 // Receiver pass icon: a keycap for keyboard players, a round face button for gamepads.
 export const ICON_COLORS = ['#2f86ff', '#27c24c', '#ff3b3b'];
 export function iconTexture(text, color, round = false) {

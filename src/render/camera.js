@@ -13,6 +13,7 @@ export class CameraDirector {
     this.t = 0;
     this.tdAngle = null;
     this.mode = 'orbit';
+    this.override = null;
   }
 
   kick(amount) {
@@ -43,8 +44,8 @@ export class CameraDirector {
       const b = view.ball;
       if (!pl || pl.ph === 'lineup' || pl.ph === 'presnap' || s.ph !== 'play') {
         const kickoff = pl && pl.k === 'kickoff';
-        const back = kickoff ? 23 : 17.5;
-        const h = kickoff ? 15 : s.ph === 'playSelect' ? 14 : 12.5;
+        const back = kickoff ? 23 : 17.2;
+        const h = kickoff ? 15 : s.ph === 'playSelect' ? 13 : 11.6;
         const ahead = kickoff ? 18 : 8.5;
         pos = new THREE.Vector3(0, h, losZ - dir * back);
         look = new THREE.Vector3(0, 0.6, losZ + dir * ahead);
@@ -54,9 +55,9 @@ export class CameraDirector {
         // follow the ball
         let fx = b.x;
         let fz = b.z;
-        let h = 12.5;
-        let back = 17.5;
-        let ahead = 7;
+        let h = 11;
+        let back = 15.5;
+        let ahead = 7.5;
         if (b.state === 'air' && view.flight) {
           const f = view.flight;
           const len = Math.hypot(f.tx - f.fx, f.tz - f.fz);
@@ -90,6 +91,13 @@ export class CameraDirector {
           kl = 7;
         }
       }
+    }
+    if (this.override) {
+      // fixed camera for close-ups and screenshots: { pos: [x, y, z], look: [x, y, z] }
+      pos = new THREE.Vector3(...this.override.pos);
+      look = new THREE.Vector3(...this.override.look);
+      kp = 1e3;
+      kl = 1e3;
     }
     this.pos.lerp(pos, damp(kp, dt));
     this.look.lerp(look, damp(kl, dt));

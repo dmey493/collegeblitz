@@ -121,7 +121,7 @@ export class GameRenderer {
     this.r.setPixelRatio(pr);
     this.r.setSize(w, h, false);
     this.camera.aspect = w / h;
-    this.camera.fov = THREE.MathUtils.clamp(45 * Math.max(1, 1.5 / this.camera.aspect), 45, 72);
+    this.camera.fov = THREE.MathUtils.clamp(49 * Math.max(1, 1.5 / this.camera.aspect), 49, 74);
     this.camera.updateProjectionMatrix();
     this.effects.setScale(h * pr);
   }
@@ -269,7 +269,11 @@ export class GameRenderer {
         seen.add(id);
         const x = (i - 3) * 2.1 * (team === 0 ? 1 : -1);
         const z = team === 0 ? -2.2 - Math.abs(i - 3) * 0.35 : 2.2 + Math.abs(i - 3) * 0.35;
-        m.update({ x, z, y: 0, face: team === 0 ? 0.25 * Math.sign(-x) : Math.PI + 0.25 * Math.sign(x), vx: 0, vz: 0, state: 'stand', st: 1, turbo: false, fallFwd: false, carrying: false }, dt, ctxAnim);
+        const base = { x, z, y: 0, face: team === 0 ? 0.25 * Math.sign(-x) : Math.PI + 0.25 * Math.sign(x), vx: 0, vz: 0, state: 'stand', st: 1, turbo: false, fallFwd: false, carrying: false };
+        // test hook: lets a screenshot script pose the lineup ({ state, st, vx, ... } per player)
+        const extra = this.showcasePose ? this.showcasePose(team, slot, i, this.time) : null;
+        if (extra && extra.hidden) m.root.visible = false;
+        else m.update(extra ? { ...base, ...extra } : base, dt, ctxAnim);
       });
     }
   }
