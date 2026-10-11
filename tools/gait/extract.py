@@ -174,4 +174,5 @@ def main():
     }
     print(json.dumps(res))
 
-main()
+if __name__ == '__main__':
+    main()

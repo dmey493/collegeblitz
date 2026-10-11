@@ -81,7 +81,8 @@ steering, the human QB takes his drop automatically.
   game's sprint and turbo speeds (longer stride, higher heel kick, harder arm pump). Stride
   length grows with speed as it does for real sprinters. Backpedals and side shuffles are blended
   in from the body-relative velocity, the body leans into cuts, and leaps, layouts, flying
-  tackles, big-hit tumbles, falls and get-ups have dedicated motions.
+  tackles, big-hit tumbles and falls have dedicated motions. Getting up is motion-captured too:
+  a push-up off the turf face down, or a sit-up and roll to the knees from the back.
 * Acrobatics vary: a leap is a two-handed high-point, a one-handed stab with the body twisting
   to the ball and the legs scissoring, or a sky-high grab with the heels tucked; the shoulders
   and eyes turn to a ball coming over a shoulder. Layouts are two-handed or one-handed on the

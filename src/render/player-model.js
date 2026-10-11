@@ -5,6 +5,8 @@ import * as THREE from 'three';
 import { blobTexture, uniformTexture, uniformNormalMap, helmetTexture, skinTexture, skinNormalMap } from './textures.js';
 import { BODY, buildBones, buildPlayerGeometry, rigSpec } from './player-geo.js';
 import { GAITS } from './gait.js';
+import { CLIPS } from './clips.js';
+import { GETUP_TIME } from '../sim/constants.js';
 
 const SKINS = ['#f1c7a3', '#d9a476', '#b97c4f', '#8a5636', '#5d3a25', '#ebb995'];
 
@@ -118,7 +120,7 @@ function gaitAt(speed, phase) {
 }
 
 const basePose = () => ({
-  tiltX: 0, tiltZ: 0, bodyY: 0, spin: 0, lean: 0.06, twist: 0, headX: 0, hipTwist: 0,
+  tiltX: 0, tiltZ: 0, bodyY: 0, bodyX: 0, bodyZ: 0, spin: 0, lean: 0.06, twist: 0, bend: 0, headX: 0, hipTwist: 0,
   armFwd: [0.12, 0.12], armAbd: [0.1, 0.1], armTwist: [0, 0], elbow: [0.32, 0.32],
   legFwd: [0, 0], knee: [0.08, 0.08], ankle: [0, 0], legAbd: [0.06, 0.06],
 });
@@ -507,13 +509,8 @@ export class PlayerModel {
         break;
       }
       case 'getup': {
-        const k = 1 - ease(st / 0.45);
-        T.tiltX = this.fallTilt * k;
-        T.bodyY = -0.86 * k;
-        T.knee = [1.2 * k + 0.15, 0.6 * k + 0.15];
-        T.legFwd = [1.0 * k, 0.4 * k];
-        T.armFwd = [0.9 * k + 0.3, 0.6];
-        T.armAbd = [0.3, 0.3];
+        // motion captured: push up off the turf face down, or sit up and climb up off the back
+        this.playClip(T, this.fallTilt > 0 ? CLIPS.getupFront : CLIPS.getupBack, clamp(st / GETUP_TIME, 0, 1));
         rate = 30;
         break;
       }
@@ -637,7 +634,7 @@ export class PlayerModel {
     const snap = this.snapNext;
     this.snapNext = false;
     const mix = (a, b) => (snap ? b : lerpA(a, b, k));
-    for (const key of ['tiltX', 'tiltZ', 'bodyY', 'lean', 'twist', 'headX', 'headY', 'hipTwist']) P[key] = mix(P[key], T[key]);
+    for (const key of ['tiltX', 'tiltZ', 'bodyY', 'bodyX', 'bodyZ', 'lean', 'twist', 'bend', 'headX', 'headY', 'hipTwist']) P[key] = mix(P[key], T[key]);
     P.spin = s === 'spin' ? T.spin : 0;
     for (let i = 0; i < 2; i++) {
       for (const key of ['armFwd', 'armAbd', 'armTwist', 'elbow', 'legFwd', 'knee', 'ankle', 'legAbd']) P[key][i] = mix(P[key][i], T[key][i]);
@@ -647,11 +644,11 @@ export class PlayerModel {
     // apply to the skeleton
     const b = this.bones;
     r.rotation.y = v.face + P.spin;
-    b.pelvis.position.y = this.hipY + P.bodyY + v.y;
+    b.pelvis.position.set(P.bodyX, this.hipY + P.bodyY + v.y, P.bodyZ);
     b.pelvis.rotation.set(P.tiltX, P.hipTwist, P.tiltZ);
     // the lean bends through the lower back and the chest; the head stays up
-    b.spine.rotation.set(P.lean * 0.42, (P.twist - P.hipTwist) * 0.45, 0);
-    b.chest.rotation.set(P.lean * 0.58, (P.twist - P.hipTwist) * 0.55, 0);
+    b.spine.rotation.set(P.lean * 0.42, (P.twist - P.hipTwist) * 0.45, P.bend * 0.5);
+    b.chest.rotation.set(P.lean * 0.58, (P.twist - P.hipTwist) * 0.55, P.bend * 0.5);
     b.head.rotation.set(P.headX - P.lean * 0.55, P.headY, 0);
     const arms = [[b.shR, b.elR], [b.shL, b.elL]];
     const legs = [[b.hipR, b.kneeR, b.footR], [b.hipL, b.kneeL, b.footL]];
@@ -789,6 +786,41 @@ export class PlayerModel {
     }
     // lean into the cut
     T.tiltZ = clamp(-this.turnRate * speed * 0.022, -0.38, 0.38) * (wRun + 0.5 * wSide);
+  }
+
+  // Pose from a motion-captured one-shot clip at u (0..1).
+  playClip(T, clip, u) {
+    const n = clip.n;
+    const x = u * (n - 1);
+    const i0 = Math.min(n - 2, Math.floor(x));
+    const f = x - i0;
+    const c = clip.t;
+    const at = (k) => c[k][i0] + (c[k][i0 + 1] - c[k][i0]) * f;
+    T.tiltX = at('tiltX');
+    T.hipTwist = at('hipTwist');
+    T.tiltZ = at('tiltZ');
+    T.lean = at('lean');
+    T.twist = at('twist');
+    T.bend = at('bend');
+    T.headX = at('headX');
+    T.headY = 0;
+    const L = this.legLen;
+    T.bodyY = at('bodyY') * L;
+    // he gets up where he went down: the captured drift across the floor is faded out by the end
+    T.bodyZ = (at('bodyZ') - c.bodyZ[0] * (1 - u)) * L;
+    T.bodyX = (at('bodyX') - c.bodyX[0] * (1 - u)) * L;
+    for (let i = 0; i < 2; i++) {
+      const legF = at(`legFwd${i}`);
+      const knee = at(`knee${i}`);
+      T.legFwd[i] = legF;
+      T.legAbd[i] = at(`legAbd${i}`);
+      T.knee[i] = knee;
+      T.ankle[i] = at(`foot${i}`) - clamp(legF - knee, -0.7, 0.5) * 0.85;
+      T.armFwd[i] = at(`armFwd${i}`);
+      T.armAbd[i] = Math.max(at(`armAbdTotal${i}`), this.abd * 0.6) - this.abd;
+      T.armTwist[i] = at(`armTwist${i}`);
+      T.elbow[i] = at(`elbow${i}`);
+    }
   }
 
   // Point both arms (or just arm `only`) at a spot in the world (the ball): the hands come

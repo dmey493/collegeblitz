@@ -24,6 +24,9 @@ export const DIVE_VY = 3.3; // a layout or flying tackle: 0.44 s in the air, the
 export const DIVE_AIR = (2 * DIVE_VY) / AIR_GRAVITY;
 export const DIVE_SLIDE = 0.3;
 export const HIT_GRAVITY = 20; // a runner blown up by a big hit
+// Getting up off the turf (motion captured). Time spent lying down is shorter by as much as
+// this grew, so a downed player is out of the play as long as before.
+export const GETUP_TIME = 0.85;
 
 export const TURBO_MULT = 1.25;
 export const TURBO_DRAIN = 0.42; // per second while burning

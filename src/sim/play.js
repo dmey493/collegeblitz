@@ -4,7 +4,7 @@
 import {
   HALF_W, GOAL, END, POST_Z, POST_HALF, CROSSBAR, GRAVITY, TURBO_MULT, TURBO_DRAIN, TURBO_REGEN,
   DEF_SLOTS, DIFFICULTY, TEAMMATE_LEVEL, dirOf,
-  AIR_GRAVITY, JUMP_VY, HURDLE_VY, DIVE_VY, DIVE_AIR, DIVE_SLIDE, HIT_GRAVITY,
+  AIR_GRAVITY, JUMP_VY, HURDLE_VY, DIVE_VY, DIVE_AIR, DIVE_SLIDE, HIT_GRAVITY, GETUP_TIME,
 } from './constants.js';
 import { clamp, lerp, len, dist, turnToward, angleOf, wrapAngle } from './math.js';
 import { Player } from './player.js';
@@ -979,7 +979,7 @@ export class Play {
     this.emit({ k: 'dive', id: p.id });
   }
 
-  knockDown(p, fromX, fromZ, dur = 1.2) {
+  knockDown(p, fromX, fromZ, dur = 0.8) {
     const dx = p.x - fromX;
     const dz = p.z - fromZ;
     const d = len(dx, dz) || 1;
@@ -1571,7 +1571,7 @@ export class Play {
     this.onPossession(best, best.team !== this.poss);
     if (best.state === 'dive' || this.rng() < 0.45) {
       // falls on it
-      best.setState('down', 1.2);
+      best.setState('down', 0.8);
       this.whistle('tackle', { spotZ: best.z });
     }
   }
@@ -1851,8 +1851,8 @@ export class Play {
       p.x += p.vx * dt;
       p.z += p.vz * dt;
       p.y = 0;
-      if (p.st >= p.stDur && this.phase !== 'dead') p.setState('getup', 0.45);
-      else if (p.st >= p.stDur + 0.6) p.setState('getup', 0.45);
+      if (p.st >= p.stDur && this.phase !== 'dead') p.setState('getup', GETUP_TIME);
+      else if (p.st >= p.stDur + 0.6) p.setState('getup', GETUP_TIME);
       return;
     }
     if (st === 'getup') {
@@ -1870,7 +1870,7 @@ export class Play {
         p.y = 0;
         p.vx *= 0.35;
         p.vz *= 0.35;
-        p.setState('down', 1.7);
+        p.setState('down', 1.3);
       }
       return;
     }
@@ -1896,7 +1896,7 @@ export class Play {
       if (p.st >= p.stDur) {
         p.fallFwd = true;
         p.y = 0;
-        p.setState('down', 0.6);
+        p.setState('down', 0.25);
       }
       return;
     }
@@ -2063,7 +2063,7 @@ export class Play {
       const fz = Math.cos(c.face);
       const toward = ((d.x - c.x) * fx + (d.z - c.z) * fz) / (dist(c, d) || 1);
       if (toward > -0.2 && rng() < clamp(0.55 + (c.str - d.str) * 0.8, 0.3, 0.85)) {
-        this.knockDown(d, c.x, c.z, 1.1);
+        this.knockDown(d, c.x, c.z, 0.7);
         d.tackleCd = 1;
         this.emit({ k: 'stiffArmed', id: c.id, by: d.id });
         return;
@@ -2123,14 +2123,14 @@ export class Play {
       const pz = (c.vz + d.vz * 0.8) / 1.8;
       c.vx = px * 0.55 + ux * 1.2;
       c.vz = pz * 0.55 + uz * 1.2;
-      c.setState('down', 1.4);
+      c.setState('down', 1.0);
       d.fallFwd = true;
       if (diving) {
         // a diver keeps flying and lands on top of him
         d.vx *= 0.35;
         d.vz *= 0.35;
       } else {
-        d.setState('down', 1.0);
+        d.setState('down', 0.6);
         d.vx = c.vx;
         d.vz = c.vz;
         d.face = angleOf(c.x - d.x, c.z - d.z);
@@ -2302,7 +2302,7 @@ export class Play {
             q.y = 0.05;
             q.fallFwd = false;
             q.setState('flying');
-          } else this.knockDown(q, p.x, p.z, 1.1);
+          } else this.knockDown(q, p.x, p.z, 0.7);
           this.emit({ k: 'lateHit', id: q.id, by: p.id, x: q.x, z: q.z });
         }
       }
