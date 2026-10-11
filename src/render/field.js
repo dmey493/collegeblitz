@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { HALF_W, GOAL, END, POST_HALF, CROSSBAR } from '../sim/constants.js';
-import { grassTexture, numberTexture, endZoneTexture, midfieldTexture } from './textures.js';
+import { grassTexture, numberTexture, endZoneTexture, midfieldTexture, turfWearTexture } from './textures.js';
 
 const LINE_Y = 0.012;
 
@@ -50,8 +50,8 @@ export function buildField(teams) {
   const col = [];
   const uv = [];
   const idx = [];
-  const light = new THREE.Color('#4fa83a');
-  const dark = new THREE.Color('#3f9230');
+  const light = new THREE.Color('#3f8f33');
+  const dark = new THREE.Color('#337a29');
   const W = HALF_W + 0.7;
   let v = 0;
   for (let i = 0; i < 20; i++) {
@@ -77,6 +77,16 @@ export function buildField(teams) {
   const fieldMesh = new THREE.Mesh(fg, fieldMat);
   fieldMesh.receiveShadow = true;
   group.add(fieldMesh);
+
+  // ---- wear: dirt and divots laid over the grass, under the paint
+  const wear = new THREE.Mesh(
+    new THREE.PlaneGeometry(HALF_W * 2, GOAL * 2),
+    new THREE.MeshStandardMaterial({ map: turfWearTexture(HALF_W, GOAL), transparent: true, depthWrite: false, roughness: 1, polygonOffset: true, polygonOffsetFactor: -0.5, polygonOffsetUnits: -0.5 }),
+  );
+  wear.rotation.x = -Math.PI / 2;
+  wear.position.y = 0.0015;
+  wear.receiveShadow = true;
+  group.add(wear);
 
   // ---- end zones (team 0 defends -z, team 1 defends +z)
   const ezGeoW = HALF_W * 2;

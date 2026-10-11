@@ -3,6 +3,8 @@
 import * as THREE from 'three';
 
 export const FONT = 'Kanit, "Arial Black", Impact, sans-serif';
+// Block "varsity" numerals for jerseys
+export const NUMBER_FONT = 'Graduate, "Arial Black", Impact, sans-serif';
 
 function canvas(w, h) {
   const c = document.createElement('canvas');
@@ -43,8 +45,10 @@ export function grassTexture() {
   for (let i = 0; i < 26000; i++) {
     const x = r() * S;
     const y = r() * S;
-    const v = 170 + Math.floor(r() * 85);
-    g.fillStyle = `rgb(${v},${v},${v})`;
+    const v = 160 + Math.floor(r() * 95);
+    // most blades take the stripe color; a few are straw-colored or dead
+    const straw = r() < 0.06;
+    g.fillStyle = straw ? `rgb(${v},${Math.round(v * 0.86)},${Math.round(v * 0.55)})` : `rgb(${v},${v},${v})`;
     g.fillRect(x, y, 1 + r() * 1.5, 2 + r() * 4);
   }
   // soft mottling
@@ -60,6 +64,49 @@ export function grassTexture() {
     g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
   }
   return tex(c, { repeat: true, srgb: false });
+}
+
+// Wear on the field of play: dirt along the hashes and down the middle where the ball
+// gets spotted, scuffed goal mouths, divots everywhere. Covers the field between the goal
+// lines (x across, z along the length) and is laid over the striped grass.
+export function turfWearTexture(halfW, goal) {
+  const W = 256;
+  const H = 1024;
+  const c = canvas(W, H);
+  const g = c.getContext('2d');
+  const r = srand(31337);
+  g.clearRect(0, 0, W, H);
+  const X = (x) => ((x + halfW) / (2 * halfW)) * W;
+  const Z = (z) => ((goal - z) / (2 * goal)) * H;
+  const dirt = ['#5a4430', '#6b5238', '#4b3a2a', '#7a6646'];
+  const blot = (x, z, rx, rz, a) => softBlob(g, X(x), Z(z), rx, rz, r() * Math.PI, dirt[Math.floor(r() * dirt.length)], a * 1.4);
+  g.save();
+  // the middle of the field takes the most abuse
+  for (const lane of [0, -6.67, 6.67]) {
+    for (let i = 0; i < 520; i++) {
+      const z = (r() - 0.5) * 2 * goal * 0.96;
+      const mid = 1 - Math.min(1, Math.abs(z) / goal);
+      if (r() > 0.25 + mid * 0.75) continue;
+      blot(lane + (r() - 0.5) * (lane === 0 ? 9 : 4), z, 2 + r() * 6, 3 + r() * 10, (0.05 + r() * 0.12) * (lane === 0 ? 1 : 0.8));
+    }
+  }
+  // goal mouths
+  for (const s of [-1, 1]) for (let i = 0; i < 70; i++) blot((r() - 0.5) * 16, s * (goal - r() * 7), 3 + r() * 8, 3 + r() * 8, 0.06 + r() * 0.1);
+  g.restore();
+  // divots: dark gouges with a lighter lip
+  for (let i = 0; i < 420; i++) {
+    const x = (r() - 0.5) * 2 * halfW * 0.9;
+    const z = (r() - 0.5) * 2 * goal;
+    g.globalAlpha = 0.25 + r() * 0.3;
+    g.fillStyle = '#3a2c1e';
+    g.fillRect(X(x), Z(z), 1 + r() * 2, 1 + r() * 3);
+    g.globalAlpha = 0.15;
+    g.fillStyle = '#9a8a60';
+    g.fillRect(X(x) + 1, Z(z) - 1, 1, 1);
+  }
+  g.globalAlpha = 1;
+  const t = tex(c, { aniso: 8 });
+  return t;
 }
 
 // --------------------------------------------------------------- yard numbers
@@ -402,21 +449,156 @@ function drawNumber(g, text, cx, cy, height, fill, outline, squeeze = 0.62) {
   g.save();
   g.translate(cx, cy);
   g.scale(squeeze, 1);
-  g.font = `800 ${Math.round(height * 1.36)}px ${FONT}`;
+  g.font = `400 ${Math.round(height * 1.3)}px ${NUMBER_FONT}`;
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   g.lineJoin = 'round';
-  g.lineWidth = height * 0.16;
+  g.lineWidth = height * 0.2;
   g.strokeStyle = outline;
+  g.strokeText(text, 0, height * 0.06);
+  // block numerals: fatten the face with a stroke in its own color
+  g.lineWidth = height * 0.085;
+  g.strokeStyle = fill;
   g.strokeText(text, 0, height * 0.06);
   g.fillStyle = fill;
   g.fillText(text, 0, height * 0.06);
   g.restore();
 }
 
+// Soft-edged ellipse (a radial gradient squashed into shape; canvas blur filters are far too
+// slow to use hundreds of times at startup).
+function softBlob(g, x, y, rx, ry, angle, color, alpha) {
+  g.save();
+  g.translate(x, y);
+  g.rotate(angle);
+  g.scale(1, ry / rx);
+  const grd = g.createRadialGradient(0, 0, 0, 0, 0, rx);
+  grd.addColorStop(0, color);
+  grd.addColorStop(0.55, color);
+  grd.addColorStop(1, 'rgba(0,0,0,0)');
+  g.globalAlpha = alpha;
+  g.fillStyle = grd;
+  g.fillRect(-rx, -rx, rx * 2, rx * 2);
+  g.restore();
+}
+
+// Smear of dirt or grass: a few overlapping soft blobs.
+function smear(g, x, y, w, h, color, alpha, r, angle = 0) {
+  for (let k = 0; k < 4; k++) {
+    softBlob(g, x + (r() - 0.5) * w * 0.6, y + (r() - 0.5) * h * 0.8, w * (0.3 + r() * 0.4), h * (0.3 + r() * 0.5), angle + (r() - 0.5) * 0.5, color, alpha);
+  }
+}
+
+// Specks and scrapes inside a box.
+function grit(g, b, r, n, colors, alpha) {
+  g.save();
+  for (let i = 0; i < n; i++) {
+    g.globalAlpha = alpha * (0.4 + r() * 0.6);
+    g.fillStyle = colors[Math.floor(r() * colors.length)];
+    const len = 1 + r() * 5;
+    g.fillRect(b.x + r() * b.w, b.y + r() * b.h, len, 1 + r());
+  }
+  g.restore();
+}
+
+// Shared fabric relief (normal map) for every uniform, laid out on the same atlas: mesh knit
+// on the jersey, stitched seams, wrinkles at the waist, the elbows and behind the knees,
+// ribbed socks. Drawn as a height map, then turned into normals.
+let fabricNormals = null;
+export function uniformNormalMap(S = 512) {
+  if (fabricNormals) return fabricNormals;
+  const c = canvas(S, S);
+  const g = c.getContext('2d');
+  const r = srand(4242);
+  const box = (R) => ({ x: R.u0 * S, y: (1 - R.v1) * S, w: (R.u1 - R.u0) * S, h: (R.v1 - R.v0) * S });
+  g.fillStyle = 'rgb(128,128,128)';
+  g.fillRect(0, 0, S, S);
+  const line = (x0, y0, x1, y1, v, w = 1.4) => {
+    g.strokeStyle = `rgb(${v},${v},${v})`;
+    g.lineWidth = w;
+    g.beginPath();
+    g.moveTo(x0, y0);
+    g.lineTo(x1, y1);
+    g.stroke();
+  };
+  // a wrinkle: the same curve stroked wide-and-faint to narrow-and-strong, a cheap soft ridge
+  const fold = (x, y, len, ang, depth, width) => {
+    const mx = x + Math.cos(ang) * len * 0.5 + (r() - 0.5) * 10;
+    const my = y + Math.sin(ang) * len * 0.5 + (r() - 0.5) * 10;
+    const ex = x + Math.cos(ang) * len;
+    const ey = y + Math.sin(ang) * len;
+    g.save();
+    g.lineCap = 'round';
+    for (const [wk, a] of [[3.2, 0.12], [2.0, 0.16], [1.0, 0.22]]) {
+      g.strokeStyle = depth > 0 ? `rgba(255,255,255,${a})` : `rgba(0,0,0,${a})`;
+      g.lineWidth = width * wk;
+      g.beginPath();
+      g.moveTo(x, y);
+      g.quadraticCurveTo(mx, my, ex, ey);
+      g.stroke();
+    }
+    g.restore();
+  };
+  // jersey mesh knit
+  const knit = canvas(5, 5);
+  const kg = knit.getContext('2d');
+  kg.fillStyle = 'rgb(140,140,140)';
+  kg.fillRect(0, 0, 5, 5);
+  kg.fillStyle = 'rgb(96,96,96)';
+  kg.fillRect(1.5, 1.5, 2, 2);
+  const T = box(ATLAS.torso);
+  g.fillStyle = g.createPattern(knit, 'repeat');
+  g.fillRect(T.x, T.y, T.w, T.h);
+  const SL = box(ATLAS.sleeve);
+  g.fillRect(SL.x, SL.y, SL.w, SL.h);
+  // torso: folds where the jersey bunches at the tuck and under the arms, seams down the sides
+  for (let i = 0; i < 26; i++) fold(T.x + r() * T.w, T.y + T.h * (0.78 + r() * 0.2), 30 + r() * 50, (r() - 0.5) * 0.5, r() < 0.5 ? 1 : -1, 2 + r() * 2);
+  for (const u of [0, 0.5, 1]) {
+    for (let i = 0; i < 6; i++) fold(T.x + u * T.w + (r() - 0.5) * 40, T.y + T.h * (0.15 + r() * 0.35), 25 + r() * 30, Math.PI / 2 + (r() - 0.5) * 1.4, r() < 0.5 ? 1 : -1, 2);
+    line(T.x + u * T.w, T.y, T.x + u * T.w, T.y + T.h, 165);
+  }
+  line(T.x, T.y + T.h * 0.02, T.x + T.w, T.y + T.h * 0.02, 165, 2);
+  line(T.x, T.y + T.h * 0.035, T.x + T.w, T.y + T.h * 0.035, 90, 1.5);
+  // sleeves: hem stitching and stripe edges
+  for (const v of [0.1, 0.2, 0.32, 0.42, 0.54]) line(SL.x, SL.y + SL.h * (1 - v), SL.x + SL.w, SL.y + SL.h * (1 - v), v === 0.1 ? 170 : 110, 1.2);
+  // pants: side seams, belt edges, wrinkles behind the knee and at the hips
+  const PV = box(ATLAS.pelvis);
+  for (const u of [0.035, 0.465, 0.535, 0.965]) line(PV.x + u * PV.w, PV.y, PV.x + u * PV.w, PV.y + PV.h, 160, 1.2);
+  line(PV.x, PV.y + PV.h * 0.26, PV.x + PV.w, PV.y + PV.h * 0.26, 175, 2);
+  for (let i = 0; i < 10; i++) fold(PV.x + r() * PV.w, PV.y + PV.h * (0.4 + r() * 0.5), 15 + r() * 25, (r() - 0.5) * 0.6, r() < 0.5 ? 1 : -1, 1.5);
+  const TH = box(ATLAS.thigh);
+  for (const u of [0.03, 0.97]) line(TH.x + u * TH.w, TH.y, TH.x + u * TH.w, TH.y + TH.h, 160, 1.2);
+  for (let i = 0; i < 28; i++) fold(TH.x + r() * TH.w, TH.y + TH.h * (0.62 + r() * 0.3), 20 + r() * 40, (r() - 0.5) * 0.4, r() < 0.5 ? 1 : -1, 1.5 + r());
+  for (let i = 0; i < 14; i++) fold(TH.x + r() * TH.w, TH.y + TH.h * (0.05 + r() * 0.5), 20 + r() * 40, Math.PI / 2 + (r() - 0.5) * 0.8, r() < 0.5 ? 1 : -1, 2);
+  // socks: knit ribs
+  const SK = box(ATLAS.sock);
+  for (let x = SK.x; x < SK.x + SK.w; x += 3) line(x, SK.y, x, SK.y + SK.h * 0.78, 150, 1);
+  // height -> normals
+  const src = g.getImageData(0, 0, S, S).data;
+  const out = g.createImageData(S, S);
+  const H = (x, y) => src[((Math.min(S - 1, Math.max(0, y)) * S) + Math.min(S - 1, Math.max(0, x))) * 4] / 255;
+  const k = 2.2;
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      const du = (H(x + 1, y) - H(x - 1, y)) * k;
+      const dv = -(H(x, y + 1) - H(x, y - 1)) * k;
+      const l = Math.hypot(du, dv, 1);
+      const o = (y * S + x) * 4;
+      out.data[o] = (-du / l * 0.5 + 0.5) * 255;
+      out.data[o + 1] = (-dv / l * 0.5 + 0.5) * 255;
+      out.data[o + 2] = (1 / l * 0.5 + 0.5) * 255;
+      out.data[o + 3] = 255;
+    }
+  }
+  g.putImageData(out, 0, 0);
+  fabricNormals = tex(c, { srgb: false, aniso: 4 });
+  return fabricNormals;
+}
+
 const uniformCache = new Map();
-export function uniformTexture(team, num, size = 512) {
-  const key = `${team.id}-${num}-${size}`;
+// grime: 0 = fresh out of the locker room, 1 = a lineman in the fourth quarter
+export function uniformTexture(team, num, size = 512, grime = 0.6) {
+  const key = `${team.id}-${num}-${size}-${grime}`;
   if (uniformCache.has(key)) return uniformCache.get(key);
   const S = size;
   const c = canvas(S, S);
@@ -506,6 +688,56 @@ export function uniformTexture(team, num, size = 512) {
   band(SK, 0, 0.22, '#f3f3f1');
   band(SK, 0.2, 0.23, 'rgba(0,0,0,0.12)');
 
+  // ---- wear and tear: grass and dirt where players hit the ground, cracked numbers
+  const r = srand(num * 977 + team.id.length * 31);
+  const GRASS = '#6f7f3c';
+  const DIRT = '#8b6f4b';
+  const dark = '#2a2219';
+  const at2 = (b, u, v) => [b.x + u * b.w, b.y + (1 - v) * b.h];
+  // knees and thigh fronts (u = 0.25 / 0.75 are the fronts of the two legs)
+  for (const u of [0.25, 0.75]) {
+    for (let i = 0; i < 2 + Math.round(grime * 3); i++) {
+      const [x, y] = at2(TH, u + (r() - 0.5) * 0.18, 0.12 + r() * 0.55);
+      // scrapes run across the leg, like sliding on turf
+      smear(g, x, y, TH.w * (0.07 + r() * 0.1), TH.h * (0.03 + r() * 0.05), r() < 0.55 ? GRASS : DIRT, (0.1 + r() * 0.16) * (0.5 + grime), r, (r() - 0.5) * 0.4);
+    }
+  }
+  // seat of the pants and the hips
+  for (let i = 0; i < 1 + Math.round(grime * 3); i++) {
+    const [x, y] = at2(PV, r(), 0.2 + r() * 0.45);
+    smear(g, x, y, PV.w * 0.18, PV.h * 0.12, r() < 0.5 ? GRASS : DIRT, (0.12 + r() * 0.2) * (0.5 + grime), r);
+  }
+  // jersey: belly and sides from hitting the turf, a few on the back
+  for (let i = 0; i < 2 + Math.round(grime * 5); i++) {
+    const front = r() < 0.7;
+    const [x, y] = at2(T, (front ? 0.75 : 0.25) + (r() - 0.5) * 0.3, 0.05 + r() * 0.4);
+    smear(g, x, y, T.w * (0.04 + r() * 0.06), T.h * (0.03 + r() * 0.05), r() < 0.5 ? GRASS : DIRT, (0.14 + r() * 0.2) * (0.4 + grime), r, (r() - 0.5) * 0.8);
+  }
+  grit(g, T, r, Math.round(400 * grime), [dark, DIRT, GRASS], 0.3);
+  grit(g, TH, r, Math.round(260 * grime), [dark, DIRT, GRASS], 0.3);
+  grit(g, PV, r, Math.round(120 * grime), [dark, DIRT], 0.35);
+  grit(g, SK, r, Math.round(160 * grime), [dark, DIRT], 0.4);
+  // ankle tape takes a beating
+  smear(g, SK.x + SK.w / 2, SK.y + SK.h * 0.9, SK.w * 0.5, SK.h * 0.1, DIRT, 0.25 + grime * 0.25, r);
+  // cracked screen-printed numbers
+  g.save();
+  g.strokeStyle = C.jersey;
+  g.globalAlpha = 0.55;
+  g.lineWidth = 0.8;
+  for (const k of ['front', 'back']) {
+    const m = TORSO_MARKS[k];
+    const [cx, cy] = at2(T, m.u, m.v);
+    for (let i = 0; i < 26; i++) {
+      const x = cx + (r() - 0.5) * T.w * 0.13;
+      const y = cy + (r() - 0.5) * T.h * m.h * 0.9;
+      g.beginPath();
+      g.moveTo(x, y);
+      g.lineTo(x + (r() - 0.5) * 9, y + (r() - 0.5) * 9);
+      g.stroke();
+    }
+  }
+  g.restore();
+
   const t = tex(c, { aniso: 4 });
   uniformCache.set(key, t);
   return t;
@@ -549,9 +781,56 @@ export function helmetTexture(team, R = 0.172) {
   for (const u of [0.25, 0.75]) {
     g.drawImage(tmp, u * W - dw / 2, (decalPhi / HELMET_PHI) * H - dh / 2, dw, dh);
   }
+  // game wear: scratches, chips and paint swapped from other helmets
+  const r = srand(team.id.length * 101 + 7);
+  g.save();
+  for (let i = 0; i < 140; i++) {
+    const x = r() * W;
+    const y = (0.15 + r() * 0.75) * H;
+    g.globalAlpha = 0.18 + r() * 0.3;
+    g.strokeStyle = r() < 0.6 ? '#ffffff' : '#111111';
+    g.lineWidth = 0.6 + r() * 0.8;
+    g.beginPath();
+    g.moveTo(x, y);
+    g.lineTo(x + (r() - 0.5) * 26, y + (r() - 0.5) * 8);
+    g.stroke();
+  }
+  const others = ['#ffffff', '#0c2d6b', '#ffcb05', '#ce1126', '#1a1a1a'].filter((k) => k.toLowerCase() !== C.helmet.toLowerCase());
+  for (let i = 0; i < 9; i++) {
+    softBlob(g, r() * W, (0.3 + r() * 0.55) * H, 5 + r() * 12, 2 + r() * 3, (r() - 0.5) * 0.6, others[Math.floor(r() * others.length)], 0.4 + r() * 0.3);
+  }
+  g.restore();
   const t = tex(c, { aniso: 8 });
   helmetCache.set(team.id, t);
   return t;
+}
+
+// Brushed-metal streaks for the HUD and menus: transparent, so CSS can lay it over any
+// base color (polished steel or dark gunmetal).
+export function brushedMetalDataURL(w = 300, h = 60) {
+  const c = canvas(w, h);
+  const g = c.getContext('2d');
+  const r = srand(5150);
+  for (let i = 0; i < 1400; i++) {
+    const y = Math.floor(r() * h);
+    const x = r() * w;
+    const len = 12 + r() * 160;
+    g.fillStyle = r() < 0.5 ? `rgba(255,255,255,${0.03 + r() * 0.07})` : `rgba(0,0,0,${0.04 + r() * 0.09})`;
+    g.fillRect(x, y, len, 1);
+    if (x + len > w) g.fillRect(x - w, y, len, 1); // wrap so the tile repeats seamlessly
+  }
+  // a few deeper scratches
+  for (let i = 0; i < 14; i++) {
+    g.strokeStyle = `rgba(255,255,255,${0.08 + r() * 0.1})`;
+    g.lineWidth = 0.7;
+    g.beginPath();
+    const x = r() * w;
+    const y = r() * h;
+    g.moveTo(x, y);
+    g.lineTo(x + 10 + r() * 30, y + (r() - 0.5) * 6);
+    g.stroke();
+  }
+  return c.toDataURL();
 }
 
 // Receiver pass icon: a keycap for keyboard players, a round face button for gamepads.

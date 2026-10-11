@@ -72,7 +72,13 @@ drop automatically.
   atlas per player (wrap-around numbers, shoulder TV numbers, sleeve stripes, belt, pants
   stripes, striped socks, taped ankles); clear-coated helmets with stripe and state decal, cage
   masks for linemen, two-bar masks for skill players, optional visors.
-* Big italic chrome text for every result ("FIRST DOWN!", "INTERCEPTED!", "TOUCHDOWN!").
+* Grit over gloss: hard night lighting with stadium-light glints in the helmets, a film finish
+  (grain, vignette, contrast grade, bloom on real highlights only), chewed-up turf with dirt down
+  the hashes, and uniforms that pick up grass stains, mesh-knit relief, wrinkles and cracked
+  block numbers. Linemen get dirtier than receivers.
+* HUD and menus are brushed gunmetal plates with steel rims and rivets: down & distance lives on
+  a plate in the top-left corner ("2ND & 3"), the score in recessed windows, a segmented turbo
+  meter. Big italic chrome text for every result ("FIRST DOWN!", "INTERCEPTED!", "TOUCHDOWN!").
 * Palette: team colors + near-black UI (`#0B0D12`), chrome/steel gradients, flame orange `#FF6A00`
   and gold `#FFD23F` reserved for "hot" states (fire, big plays).
 * One font family: **Kanit** (900 italic for headlines, 600 for UI).

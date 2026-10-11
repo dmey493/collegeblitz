@@ -4,6 +4,7 @@ import '@fontsource/kanit/latin-700.css';
 import '@fontsource/kanit/latin-800.css';
 import '@fontsource/kanit/latin-800-italic.css';
 import '@fontsource/kanit/latin-900-italic.css';
+import '@fontsource/graduate/latin-400.css';
 import './ui/style.css';
 import { TEAMS } from './sim/teams.js';
 import { Input } from './input.js';
@@ -15,6 +16,7 @@ import { P2PHost, connectToHost } from './net/p2p.js';
 import { HUD } from './ui/hud.js';
 import { PlaySelect, PatChoice } from './ui/playselect.js';
 import { h, clear } from './ui/dom.js';
+import { brushedMetalDataURL } from './render/textures.js';
 import { titleScreen, setupScreen, howToScreen, settingsScreen, onlineScreen, lobbyScreen, pauseScreen, finalScreen } from './ui/screens.js';
 
 const STORE = 'collegeblitz.settings.v1';
@@ -57,6 +59,7 @@ const CALLS = {
 class App {
   constructor() {
     this.settings = loadSettings();
+    document.documentElement.style.setProperty('--steel-tex', `url(${brushedMetalDataURL()})`);
     this.canvas = document.getElementById('game');
     this.ui = document.getElementById('ui');
     this.overlayRoot = h('div.overlays');
@@ -613,7 +616,7 @@ async function boot() {
   // canvas textures need the display font loaded first
   try {
     await Promise.race([
-      Promise.all(['italic 900 64px Kanit', 'italic 800 64px Kanit', '800 64px Kanit', '700 64px Kanit', '600 32px Kanit'].map((f) => document.fonts.load(f))),
+      Promise.all(['italic 900 64px Kanit', 'italic 800 64px Kanit', '800 64px Kanit', '700 64px Kanit', '600 32px Kanit', '400 64px Graduate'].map((f) => document.fonts.load(f))),
       new Promise((r) => setTimeout(r, 2500)),
     ]);
   } catch {

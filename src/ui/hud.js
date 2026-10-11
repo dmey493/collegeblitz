@@ -39,14 +39,15 @@ export class HUD {
         h('span.sb-fire', '🔥'),
         h(`span.sb-score#sb-score-${i}`, '0'));
     };
-    this.score = h('div.scorebug', side(0), h('div.sb-mid', h('span.sb-q', '1ST'), h('span.sb-clock', '2:00')), side(1));
-    this.down = h('div.downdist', h('div.dd-main', ''), h('div.dd-sub', ''));
-    this.turbo = h('div.turbo', h('div.turbo-label', 'TURBO'), h('div.turbo-bar', h('div.turbo-fill')));
+    const rivets = () => ['tl', 'tr', 'bl', 'br'].map((c) => h(`i.rivet.${c}`));
+    this.score = h('div.scorebug.gunmetal', side(0), h('div.sb-mid', h('span.sb-q', '1ST'), h('span.sb-clock', '2:00')), side(1));
+    this.down = h('div.downdist.gunmetal', ...rivets(), h('div.dd-main.chrome', ''), h('div.dd-sub', ''));
+    this.turbo = h('div.turbo.gunmetal', ...rivets(), h('div.turbo-label.chrome', 'TURBO'), h('div.turbo-bar', h('div.turbo-fill')));
     this.msg = h('div.callout', h('div.co-main'), h('div.co-sub'));
     this.pop = h('div.pop');
-    this.hint = h('div.hint');
+    this.hint = h('div.hint.gunmetal');
     this.ping = h('div.ping');
-    this.banner = h('div.banner', h('div.bn-main'), h('div.bn-sub'));
+    this.banner = h('div.banner.gunmetal', h('div.bn-main.chrome'), h('div.bn-sub'));
     this.el.append(this.score, this.down, this.turbo, this.msg, this.pop, this.hint, this.ping, this.banner);
     this.shownScore = [0, 0];
     this.lastScore = [0, 0];
@@ -190,10 +191,17 @@ export class HUD {
     clk.classList.toggle('low', !s.ot && s.clk <= 10);
 
     const pl = s.pl;
-    const pre = pl && s.ph === 'play' && (pl.ph === 'lineup' || pl.ph === 'presnap') && (pl.k === 'scrimmage' || pl.k === 'two');
-    this.down.classList.toggle('show', !!pre && s.ph !== 'banner');
-    if (pre) {
-      this.down.querySelector('.dd-main').textContent = downText(s);
+    const scrim = pl && s.ph === 'play' && (pl.k === 'scrimmage' || pl.k === 'two');
+    this.down.classList.toggle('show', !!scrim);
+    if (scrim) {
+      const txt = downText(s);
+      if (this.downKey !== txt) {
+        this.downKey = txt;
+        const main = this.down.querySelector('.dd-main');
+        main.textContent = '';
+        const [a, b] = txt.split(' & ');
+        main.append(a, ...(b ? [h('span.amp', ' & '), b] : []));
+      }
       this.down.querySelector('.dd-sub').textContent = spotText(s, this.teams);
     }
     // turbo meter for my team

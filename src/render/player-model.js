@@ -2,7 +2,7 @@
 // barrel chest, slim legs, glossy helmet and cage) posed by a small pose system
 // driven by the sim state.
 import * as THREE from 'three';
-import { blobTexture, uniformTexture, helmetTexture } from './textures.js';
+import { blobTexture, uniformTexture, uniformNormalMap, helmetTexture } from './textures.js';
 import { BODY, buildBones, buildPlayerGeometry } from './player-geo.js';
 
 const SKINS = ['#f1c7a3', '#d9a476', '#b97c4f', '#8a5636', '#5d3a25', '#ebb995'];
@@ -33,7 +33,7 @@ function geometryFor(body, team) {
   return S.geos.get(key);
 }
 
-function materialsFor(team, num, skinIdx, visor, envMap) {
+function materialsFor(team, num, skinIdx, visor, envMap, grime) {
   const S = sharedAssets();
   if (!S.gear) {
     S.gear = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.42, metalness: 0.12, envMap, envMapIntensity: 0.6 });
@@ -49,7 +49,10 @@ function materialsFor(team, num, skinIdx, visor, envMap) {
   }
   const ukey = `${team.id}-${num}`;
   if (!S.uniforms.has(ukey)) {
-    S.uniforms.set(ukey, new THREE.MeshStandardMaterial({ map: uniformTexture(team, num), vertexColors: true, roughness: 0.66 }));
+    S.uniforms.set(ukey, new THREE.MeshStandardMaterial({
+      map: uniformTexture(team, num, 512, grime), normalMap: uniformNormalMap(), normalScale: new THREE.Vector2(0.9, 0.9),
+      vertexColors: true, roughness: 0.72,
+    }));
   }
   return [S.uniforms.get(ukey), S.skin[skinIdx], S.helmets.get(team.id), S.gear, visor ? S.visor : S.hidden];
 }
@@ -71,7 +74,9 @@ export class PlayerModel {
 
     const skinIdx = (id * 7 + num) % SKINS.length;
     const visor = ((id * 31 + num * 7) % 10) < (body === 'big' ? 1 : 4);
-    const mesh = new THREE.SkinnedMesh(geometryFor(body, team), materialsFor(team, num, skinIdx, visor, envMap));
+    // linemen live in the dirt; receivers stay a little cleaner
+    const grime = body === 'big' ? 0.9 : body === 'mid' ? 0.65 : 0.45;
+    const mesh = new THREE.SkinnedMesh(geometryFor(body, team), materialsFor(team, num, skinIdx, visor, envMap, grime));
     const { bones, list } = buildBones(B);
     mesh.add(bones.root);
     mesh.updateMatrixWorld(true);

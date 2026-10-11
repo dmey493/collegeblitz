@@ -1,6 +1,10 @@
 // Scene setup and per-frame sync from a (possibly interpolated) game snapshot.
 import * as THREE from 'three';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { buildField } from './field.js';
 import { Stadium } from './stadium.js';
 import { PlayerModel } from './player-model.js';
@@ -11,6 +15,67 @@ import { ROSTER_SLOTS, playerId, END } from '../sim/constants.js';
 
 const tmpV = new THREE.Vector3();
 
+// Night-stadium reflections: a dark bowl with banks of lights up high, so glossy helmets
+// pick up hard light streaks instead of a bright studio.
+function stadiumEnvironment() {
+  const scene = new THREE.Scene();
+  const sky = new THREE.Mesh(
+    new THREE.SphereGeometry(50, 32, 16),
+    new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      vertexShader: 'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: `varying vec3 vP;
+        void main() {
+          float h = normalize(vP).y;
+          vec3 top = vec3(0.02, 0.025, 0.05);
+          vec3 rim = vec3(0.16, 0.13, 0.12);
+          vec3 ground = vec3(0.035, 0.07, 0.03);
+          vec3 c = h > 0.0 ? mix(rim, top, smoothstep(0.0, 0.55, h)) : mix(rim, ground, smoothstep(0.0, 0.25, -h));
+          gl_FragColor = vec4(c, 1.0);
+        }`,
+    }),
+  );
+  scene.add(sky);
+  const lamp = new THREE.MeshBasicMaterial({ color: new THREE.Color(9, 8.4, 7.4) });
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + 0.3;
+    const bank = new THREE.Mesh(new THREE.PlaneGeometry(9, 3.2), lamp);
+    bank.position.set(Math.cos(a) * 38, 22, Math.sin(a) * 38);
+    bank.lookAt(0, 0, 0);
+    scene.add(bank);
+  }
+  // the warm glow of the crowd ring
+  const ring = new THREE.Mesh(new THREE.CylinderGeometry(44, 44, 8, 48, 1, true), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.5, 0.36, 0.3), side: THREE.BackSide }));
+  ring.position.y = 5;
+  scene.add(ring);
+  return scene;
+}
+
+// Film-style finish: a little chromatic fringe, contrast and a cool-shadow / warm-highlight
+// grade, vignette and moving grain. Runs after tone mapping, on display colors.
+const GritShader = {
+  uniforms: { tDiffuse: { value: null }, time: { value: 0 }, res: { value: new THREE.Vector2(1, 1) }, grain: { value: 0.06 } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float time; uniform vec2 res; uniform float grain;
+    varying vec2 vUv;
+    float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+    void main() {
+      vec2 d = vUv - 0.5;
+      float r2 = dot(d, d);
+      vec2 off = d * r2 * 0.01;
+      vec3 c = vec3(texture2D(tDiffuse, vUv + off).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - off).b);
+      float l = dot(c, vec3(0.299, 0.587, 0.114));
+      c = mix(vec3(l), c, 0.86);
+      c = (c - 0.5) * 1.13 + 0.5;
+      c += vec3(-0.015, 0.0, 0.025) * (1.0 - l) + vec3(0.03, 0.012, -0.02) * l;
+      c *= 1.0 - smoothstep(0.3, 0.92, length(d * vec2(1.0, 0.8))) * 0.45;
+      float n = hash(floor(vUv * res) + fract(time * 7.0) * 61.0) - 0.5;
+      c += n * grain * (1.1 - l);
+      gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
+    }`,
+};
+
 export class GameRenderer {
   constructor(canvas, { quality = 'high' } = {}) {
     this.canvas = canvas;
@@ -18,7 +83,7 @@ export class GameRenderer {
     const r = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.toneMapping = THREE.ACESFilmicToneMapping;
-    r.toneMappingExposure = 1.05;
+    r.toneMappingExposure = 0.95;
     r.shadowMap.enabled = quality !== 'low';
     r.shadowMap.type = THREE.PCFShadowMap;
     this.r = r;
@@ -29,9 +94,9 @@ export class GameRenderer {
     this.director = new CameraDirector(this.camera);
 
     // lights: a night game under four towers
-    this.hemi = new THREE.HemisphereLight('#a9bcff', '#26431c', 0.95);
+    this.hemi = new THREE.HemisphereLight('#8796c8', '#1c2a12', 0.62);
     this.scene.add(this.hemi);
-    this.key = new THREE.DirectionalLight('#fff3df', 2.6);
+    this.key = new THREE.DirectionalLight('#ffeed4', 2.7);
     this.key.castShadow = quality !== 'low';
     this.key.shadow.mapSize.set(2048, 2048);
     const sc = this.key.shadow.camera;
@@ -44,14 +109,17 @@ export class GameRenderer {
     this.key.shadow.bias = -0.0004;
     this.key.shadow.normalBias = 0.03;
     this.scene.add(this.key, this.key.target);
-    const fill1 = new THREE.DirectionalLight('#cbd7ff', 0.85);
+    const fill1 = new THREE.DirectionalLight('#c3d0ff', 0.45);
     fill1.position.set(-60, 50, 80);
-    const fill2 = new THREE.DirectionalLight('#ffe7c6', 0.7);
+    const fill2 = new THREE.DirectionalLight('#ffe3bd', 0.35);
     fill2.position.set(60, 45, -90);
-    this.scene.add(fill1, fill2);
+    // stadium lights behind the play: hard edge light on helmets and pads
+    this.rim = new THREE.DirectionalLight('#d6e2ff', 1.9);
+    this.scene.add(fill1, fill2, this.rim, this.rim.target);
 
     const pmrem = new THREE.PMREMGenerator(r);
-    this.envMap = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.envMap = pmrem.fromScene(stadiumEnvironment(), 0.03).texture;
+    this.setupPost();
 
     this.effects = new Effects(this.scene);
     this.ball = makeBall();
@@ -66,6 +134,20 @@ export class GameRenderer {
     this.lastPlayNo = -1;
     this.flashT = 0;
     this.resize();
+  }
+
+  // Bloom + film finish on HIGH; LOW renders straight to the screen.
+  setupPost() {
+    const r = this.r;
+    const composer = new EffectComposer(r, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 }));
+    composer.addPass(new RenderPass(this.scene, this.camera));
+    // only real highlights bloom: lamps, helmet glints, fire
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.22, 0.35, 1.35);
+    composer.addPass(this.bloom);
+    composer.addPass(new OutputPass());
+    this.grit = new ShaderPass(GritShader);
+    composer.addPass(this.grit);
+    this.composer = composer;
   }
 
   setQuality(q) {
@@ -122,6 +204,12 @@ export class GameRenderer {
     const pr = Math.min(window.devicePixelRatio || 1, this.quality === 'low' ? 1 : 2);
     this.r.setPixelRatio(pr);
     this.r.setSize(w, h, false);
+    if (this.composer) {
+      this.composer.setPixelRatio(pr);
+      this.composer.setSize(w, h);
+      this.bloom.resolution.set(w / 2, h / 2);
+      this.grit.uniforms.res.value.set(w * pr, h * pr);
+    }
     this.camera.aspect = w / h;
     this.camera.fov = THREE.MathUtils.clamp(49 * Math.max(1, 1.5 / this.camera.aspect), 49, 74);
     this.camera.updateProjectionMatrix();
@@ -239,6 +327,9 @@ export class GameRenderer {
     const look = this.director.look;
     this.key.position.set(look.x + 18, 48, look.z - 12);
     this.key.target.position.set(look.x, 0, look.z);
+    const away = tmpV.copy(look).sub(this.camera.position).setY(0).normalize();
+    this.rim.position.set(look.x + away.x * 40 - 12, 26, look.z + away.z * 40);
+    this.rim.target.position.set(look.x, 1, look.z);
     for (const s of this.streamers || []) s.rotation.y = Math.PI / 2 + Math.sin(this.time * 4 + s.position.x) * 0.35;
     // goal posts fade out when the camera is parked behind them (backed up near the end line)
     for (const gp of this.goalposts || []) {
@@ -265,9 +356,14 @@ export class GameRenderer {
     this.markers && this.markers.update(dt);
     if (this.flashT > 0) {
       this.flashT -= dt;
-      this.r.toneMappingExposure = 1.05 + Math.max(0, this.flashT) * 4;
-    } else this.r.toneMappingExposure = 1.05;
-    if (!ctx.skipDraw) this.r.render(this.scene, this.camera);
+      this.r.toneMappingExposure = 0.95 + Math.max(0, this.flashT) * 4;
+    } else this.r.toneMappingExposure = 0.95;
+    if (!ctx.skipDraw) {
+      if (this.quality !== 'low') {
+        this.grit.uniforms.time.value = this.time;
+        this.composer.render(dt);
+      } else this.r.render(this.scene, this.camera);
+    }
   }
 
   renderShowcase(dt, seen, ctxAnim) {

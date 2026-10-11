@@ -16,6 +16,7 @@
     "node": ">=20.19"
   },
   "dependencies": {
+    "@fontsource/graduate": "^5.3.0",
     "@fontsource/kanit": "^5.3.0",
     "@netlify/blobs": "^8.2.0",
     "three": "^0.186.1",
