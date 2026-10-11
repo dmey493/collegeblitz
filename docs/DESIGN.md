@@ -78,6 +78,11 @@ steering, the human QB takes his drop automatically.
 * Animation runs on stride length (long, powerful strides at speed, heel kick, pumping arms),
   blends in backpedals and side shuffles from the body-relative velocity, leans into cuts, and
   has dedicated leap, layout, flying-tackle, big-hit tumble, fall and get-up motions.
+* Acrobatics vary: a leap is a two-handed high-point, a one-handed stab with the body twisting
+  to the ball and the legs scissoring, or a sky-high grab with the heels tucked; the shoulders
+  and eyes turn to a ball coming over a shoulder. Layouts are two-handed or one-handed on the
+  side; flying tackles go in arms-wide or shoulder-first. The man who lays a big hit or gets a
+  sack flexes or points down at his victim after the whistle.
 * Regular tackles are wrap-ups: the tackler latches on and both go down together the way he was
   driving, him on top. Blockers and rushers lock up with their hands on each other.
 * The camera rides a pass out, moves in tight on the catch and stays tight on the runner; after

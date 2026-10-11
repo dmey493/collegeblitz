@@ -604,7 +604,7 @@ export class Match {
         tg: [p.target[0] ? p.target[0].id : -1, p.target[1] ? p.target[1].id : -1],
         P: p.players.map((q) => [
           q.id, round2(q.x), round2(q.z), round2(q.y), round2(q.face), round2(q.vx), round2(q.vz),
-          q.state, round2(q.st), (q.turboOn ? 1 : 0) | (q.fallFwd ? 2 : 0) | (q.hug ? 4 : 0),
+          q.state, round2(q.st), (q.turboOn ? 1 : 0) | (q.fallFwd ? 2 : 0) | (q.hug ? 4 : 0) | (q.taunt ? 8 : 0),
         ]),
         B: [round2(b.x), round2(b.y), round2(b.z), b.state, b.carrier ? b.carrier.id : -1, b.f ? b.f.kind : ''],
         res: p.result ? { type: p.result.type, team: p.result.team, good: p.result.good, id: p.scorer ? p.scorer.id : -1 } : null,

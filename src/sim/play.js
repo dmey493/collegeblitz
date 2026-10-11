@@ -2144,7 +2144,7 @@ export class Play {
     }
     // a flying tackle that connects: a beat of hit-stop
     if (diving && !big) this.m.hitStop(0.045, 0.3);
-    this.lastTackle = { by: d.id, on: c.id, big, x: spotX, z: spotZ };
+    this.lastTackle = { by: d.id, on: c.id, big, x: spotX, z: spotZ, taunt: big || sack };
     this.emit({ k: 'tackle', id: c.id, by: d.id, big, sack, dive: diving, x: Math.round(spotX * 10) / 10, z: Math.round(spotZ * 10) / 10 });
     if (fumbled && !(dirOf(c.team) * spotZ >= GOAL)) {
       this.fumble(spotX, spotZ, big ? 'bigHit' : 'hit');
@@ -2250,6 +2250,19 @@ export class Play {
           p.iz = 0;
         }
         continue;
+      }
+      // the man who laid the big hit or got the sack lets everybody know about it
+      const lt = this.lastTackle;
+      if (lt && lt.taunt && p.id === lt.by && (!res || res.type !== 'td')) {
+        if (p.state === 'stand' && this.deadT > 0.9) {
+          p.setState('celebrate');
+          p.taunt = true;
+        }
+        if (p.taunt) {
+          p.ix = 0;
+          p.iz = 0;
+          continue;
+        }
       }
       // coast to a stop
       p.ix *= 0.9;

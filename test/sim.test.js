@@ -278,3 +278,25 @@ test('after a turnover the screen and the stick both face the new ball carrier',
   assert.ok(lb.z < z0 - 0.5, `pushing up runs him toward his own goal line direction (${lb.z} vs ${z0})`);
   assert.equal(m.snapshot().pl.vd, -1);
 });
+
+test('a big hit or a sack earns a taunt once the play is dead', () => {
+  const m = new Match({ teams: ['IND', 'MICH'], humans: [false, false], seed: 4, rules: { quarterSec: 120 } });
+  let taunts = 0;
+  let last = null;
+  for (let i = 0; i < 60 * 60 * 12 && m.phase !== 'final'; i++) {
+    m.step(1 / 60);
+    m.drainEvents();
+    const p = m.play;
+    if (p) {
+      for (const q of p.players) {
+        if (q.taunt && last !== p) {
+          taunts++;
+          last = p;
+          assert.equal(p.phase, 'dead');
+          assert.equal(q.id, p.lastTackle.by);
+        }
+      }
+    }
+  }
+  assert.ok(taunts >= 3, `taunts: ${taunts}`);
+});

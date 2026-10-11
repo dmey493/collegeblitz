@@ -123,6 +123,7 @@ export class PlayerModel {
 
     // pose state (current values, smoothed toward targets)
     this.p = basePose();
+    this.p.headY = 0;
     this.prevState = '';
     this.lastFace = 0;
     this.lastY = 0;
@@ -136,6 +137,11 @@ export class PlayerModel {
     this.fallTilt = 1.52;
     this.flip = false;
     this.snapNext = false;
+    this.seed = 0;
+    this.ballRel = 0;
+    this.oneHand = -1;
+    this.leapStyle = 0;
+    this.diveStyle = 0;
   }
 
   // view: { x, z, y, face, vx, vz, state, st, turbo, fallFwd, carrying, reach, ball }
@@ -155,7 +161,11 @@ export class PlayerModel {
     this.lastY = v.y;
     this.reachHint = !!(v.ball || v.carrying);
     this.lastFallFwd = !!v.fallFwd;
+    this.seed = ctx.celebrateSeed || 0;
+    // where the ball is relative to the way he faces (+ = his left), for turning to it
+    this.ballRel = v.ball ? wrap(Math.atan2(v.ball.x - v.x, v.ball.z - v.z) - v.face) : 0;
     if (s !== this.prevState) this.enter(s, this.prevState);
+    this.oneHand = -1;
 
     const T = basePose();
     let rate = 16;
@@ -277,16 +287,17 @@ export class PlayerModel {
         break;
       }
       case 'jump': {
-        // explode up driving one knee, hands reaching; legs come down to land
+        // explode up, hands reaching, then the legs come down to land. Three ways up:
+        // 0 high-point with both hands driving a knee, 1 a one-handed stab with the body
+        // twisting to the ball and the legs scissoring, 2 skying with the heels tucked
         const lead = this.id % 2;
         const up = ease(Math.min(1, st / 0.12));
         const rising = this.vy > -0.5;
+        const style = this.leapStyle;
+        const side = this.ballRel >= 0 ? 1 : 0; // arm on the ball's side
+        const turn = clamp(this.ballRel * 0.7, -1.1, 1.1);
         T.legFwd = [0, 0];
         T.knee = [0, 0];
-        T.legFwd[lead] = 1.05 * up;
-        T.knee[lead] = 1.55 * up;
-        T.legFwd[1 - lead] = -0.2;
-        T.knee[1 - lead] = 0.3;
         T.ankle = [0.6, 0.6];
         T.legAbd = [0.05, 0.05];
         T.armFwd = [2.85, 2.85];
@@ -294,6 +305,33 @@ export class PlayerModel {
         T.elbow = [0.25, 0.25];
         T.lean = -0.06;
         T.headX = -0.3;
+        // turn the shoulders (and the eyes) to a ball coming over a shoulder
+        T.twist = turn;
+        T.headY = turn * 0.5;
+        if (style === 1) {
+          this.oneHand = side;
+          T.armFwd[1 - side] = 0.5;
+          T.armAbd[1 - side] = 1.25;
+          T.elbow[1 - side] = 0.5;
+          T.tiltZ = (side ? -0.32 : 0.32) * up;
+          T.legFwd[lead] = 0.9 * up;
+          T.knee[lead] = 1.2 * up;
+          T.legFwd[1 - lead] = -0.55 * up;
+          T.knee[1 - lead] = 1.25 * up;
+          T.twist = turn + (side ? 0.35 : -0.35);
+        } else if (style === 2) {
+          T.legFwd = [-0.3 * up, -0.2 * up];
+          T.knee = [1.75 * up, 1.6 * up];
+          T.ankle = [0.75, 0.75];
+          T.legAbd = [0.12, 0.12];
+          T.lean = -0.28 * up;
+          T.headX = -0.45;
+        } else {
+          T.legFwd[lead] = 1.05 * up;
+          T.knee[lead] = 1.55 * up;
+          T.legFwd[1 - lead] = -0.2;
+          T.knee[1 - lead] = 0.3;
+        }
         if (!rising) {
           T.legFwd = [0.35, 0.3];
           T.knee = [0.5, 0.4];
@@ -353,10 +391,30 @@ export class PlayerModel {
           T.armFwd = [2.3, 2.3];
           T.armAbd = [0.12, 0.12];
           T.elbow = [1.15, 1.15];
+        } else if (this.catchDive && this.diveStyle === 1) {
+          // a one-handed layout, rolled onto his side, the other arm tucked
+          const side = this.ballRel >= 0 ? 1 : 0;
+          this.oneHand = side;
+          T.armFwd[side] = 3.1;
+          T.armAbd[side] = 0.05;
+          T.elbow[side] = 0.1;
+          T.armFwd[1 - side] = 1.3;
+          T.armAbd[1 - side] = 0.2;
+          T.elbow[1 - side] = 1.7;
+          T.tiltZ = (side ? -0.55 : 0.55) * launch;
+          T.legFwd = [-0.05, -0.35];
+          T.knee = [0.6, 0.25];
         } else if (this.catchDive) {
           T.armFwd = [3.05, 3.05];
           T.armAbd = [-0.02, -0.02];
           T.elbow = [0.15, 0.15];
+        } else if (this.diveStyle === 1) {
+          // spear: shoulder first, arms cocked to wrap
+          T.armFwd = [2.1, 2.1];
+          T.armAbd = [0.28, 0.28];
+          T.elbow = [1.2, 1.2];
+          T.headX = -0.35 * launch;
+          T.tiltZ = (this.id % 2 ? 0.3 : -0.3) * launch;
         } else {
           T.armFwd = [2.75, 2.75];
           T.armAbd = [0.6, 0.6];
@@ -458,6 +516,31 @@ export class PlayerModel {
       case 'celebrate': {
         const kind = (this.id + (ctx.celebrateSeed || 0)) % 3;
         const tt = ctx.time * 6;
+        if (v.taunt) {
+          // over the man he just flattened: a double-biceps flex, or a point down at him
+          const pump = Math.sin(tt * 0.8) * 0.15;
+          if ((this.id + (ctx.celebrateSeed || 0)) % 2 === 0) {
+            T.armFwd = [0.2, 0.2];
+            T.armAbd = [1.35 + pump, 1.35 - pump];
+            T.elbow = [2.1, 2.1];
+            T.armTwist = [1.45, 1.45];
+            T.lean = -0.12;
+            T.headX = -0.25;
+            T.bodyY = -0.05;
+            T.legAbd = [0.16, 0.16];
+            T.knee = [0.25, 0.25];
+          } else {
+            T.armFwd = [0.75, 0.2];
+            T.armAbd = [0.15, 0.3];
+            T.elbow = [0.05, 0.4];
+            T.lean = 0.35;
+            T.headX = 0.25;
+            T.twist = 0.25 + pump;
+            T.legFwd = [0.25, -0.1];
+          }
+          rate = 14;
+          break;
+        }
         if (kind === 0) {
           T.bodyY = Math.abs(Math.sin(tt)) * 0.35;
           T.armFwd = [2.9, 2.9];
@@ -483,7 +566,8 @@ export class PlayerModel {
 
     // hands go to the ball: in the air toward a receiver, or caught at the top of a leap
     const airborneCatch = s === 'jump' || (s === 'dive' && this.catchDive && !v.carrying);
-    if (v.ball && !v.carrying && (v.reach || airborneCatch) && s !== 'throw') this.aimArms(T, v.ball, s === 'dive' ? 0.15 : 0.25);
+    if (v.ball && !v.carrying && (v.reach || airborneCatch) && s !== 'throw') this.aimArms(T, v.ball, s === 'dive' ? 0.15 : 0.25, this.oneHand);
+    if (T.headY === undefined) T.headY = -T.twist * 0.4;
     // ball carriers tuck it under the right arm (and pull it in after a catch in the air)
     if (v.carrying && s !== 'celebrate' && s !== 'down' && s !== 'flying' && s !== 'getup' && s !== 'throw' && s !== 'kneel') {
       if (s === 'dive') {
@@ -508,7 +592,7 @@ export class PlayerModel {
     const snap = this.snapNext;
     this.snapNext = false;
     const mix = (a, b) => (snap ? b : lerpA(a, b, k));
-    for (const key of ['tiltX', 'tiltZ', 'bodyY', 'lean', 'twist', 'headX', 'hipTwist']) P[key] = mix(P[key], T[key]);
+    for (const key of ['tiltX', 'tiltZ', 'bodyY', 'lean', 'twist', 'headX', 'headY', 'hipTwist']) P[key] = mix(P[key], T[key]);
     P.spin = s === 'spin' ? T.spin : 0;
     for (let i = 0; i < 2; i++) {
       for (const key of ['armFwd', 'armAbd', 'armTwist', 'elbow', 'legFwd', 'knee', 'ankle', 'legAbd']) P[key][i] = mix(P[key][i], T[key][i]);
@@ -523,7 +607,7 @@ export class PlayerModel {
     // the lean bends through the lower back and the chest; the head stays up
     b.spine.rotation.set(P.lean * 0.42, (P.twist - P.hipTwist) * 0.45, 0);
     b.chest.rotation.set(P.lean * 0.58, (P.twist - P.hipTwist) * 0.55, 0);
-    b.head.rotation.set(P.headX - P.lean * 0.55, -P.twist * 0.4, 0);
+    b.head.rotation.set(P.headX - P.lean * 0.55, P.headY, 0);
     const arms = [[b.shR, b.elR], [b.shL, b.elL]];
     const legs = [[b.hipR, b.kneeR, b.footR], [b.hipL, b.kneeL, b.footL]];
     for (let i = 0; i < 2; i++) {
@@ -544,7 +628,13 @@ export class PlayerModel {
 
   // State changes that need memory: how a fall started, which kind of dive this is.
   enter(s, prev) {
-    if (s === 'dive') this.catchDive = this.reachHint;
+    // a different move each time: picked per player and per play
+    const roll = (this.id * 7 + this.seed * 13 + (s === 'dive' ? 5 : 0)) % 6;
+    if (s === 'jump') this.leapStyle = roll % 3;
+    if (s === 'dive') {
+      this.catchDive = this.reachHint;
+      this.diveStyle = roll % 2;
+    }
     if (s === 'flying') this.flip = this.id % 3 === 0;
     if (s === 'down') {
       // a diver or a blown-up runner is already on his way down: no second fall
@@ -653,13 +743,15 @@ export class PlayerModel {
     T.tiltZ = clamp(-this.turnRate * speed * 0.022, -0.38, 0.38) * (wRun + 0.5 * wSide);
   }
 
-  // Point both arms at a spot in the world (the ball): the hands come together on it.
-  aimArms(T, ball, elbow) {
+  // Point both arms (or just arm `only`) at a spot in the world (the ball): the hands come
+  // together on it.
+  aimArms(T, ball, elbow, only = -1) {
     const chest = this.bones.chest;
     chest.updateWorldMatrix(true, false);
     tmpA.set(ball.x, ball.y, ball.z);
     chest.worldToLocal(tmpA);
     for (let i = 0; i < 2; i++) {
+      if (only >= 0 && i !== only) continue;
       const side = i === 0 ? -1 : 1;
       const sh = i === 0 ? this.bones.shR.position : this.bones.shL.position;
       const dx = tmpA.x - sh.x * 0.55;

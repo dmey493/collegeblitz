@@ -72,6 +72,7 @@ export class Player {
     this.stDur = 0;
     this.fallFwd = false;
     this.hug = false; // a tackler wrapped up on the man he took down
+    this.taunt = false; // celebrating a big hit or a sack
 
     this.job = 'idle';
     this.jd = {}; // job data
@@ -105,6 +106,7 @@ export class Player {
     this.st = 0;
     this.stDur = dur;
     this.hug = false;
+    this.taunt = false;
   }
 }
 
