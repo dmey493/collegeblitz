@@ -774,24 +774,26 @@ export class PlayerModel {
       W('bodyY', undefined, g.bodyY * this.legLen - 0.02 - 0.04 * clamp(speed / 9, 0, 1), w);
     }
     if (wBack > 0) {
-      const k = clamp(speed / 6, 0, 1);
+      // backpedal: the captured jog run backwards with short, quick steps, hips low and the
+      // chest over the knees, arms pumping in time
+      const g = gaitAt(3, -ph);
+      const k = clamp(speed / 6, 0.4, 1);
       const w = wBack;
-      W('bodyY', undefined, -0.12 - 0.04 * k, w);
-      W('lean', undefined, 0.3, w);
-      W('legFwd', 0, 0.35 + 0.38 * k * sn, w);
-      W('legFwd', 1, 0.35 - 0.38 * k * sn, w);
-      W('knee', 0, 0.6 + 0.6 * k * Math.max(0, -Math.sin(ph + 0.6)), w);
-      W('knee', 1, 0.6 + 0.6 * k * Math.max(0, Math.sin(ph + 0.6)), w);
-      W('ankle', 0, 0.15, w);
-      W('ankle', 1, 0.15, w);
-      W('legAbd', 0, 0.1, w);
-      W('legAbd', 1, 0.1, w);
-      W('armFwd', 0, 0.45 + 0.3 * k * sn, w);
-      W('armFwd', 1, 0.45 - 0.3 * k * sn, w);
-      W('elbow', 0, 1.2, w);
-      W('elbow', 1, 1.2, w);
-      W('armAbd', 0, 0.12, w);
-      W('armAbd', 1, 0.12, w);
+      for (let i = 0; i < 2; i++) {
+        const legF = 0.42 + (g.legFwd[i] - 0.2) * 0.55 * k;
+        const knee = 0.55 + g.knee[i] * 0.6 * k;
+        W('legFwd', i, legF, w);
+        W('knee', i, knee, w);
+        W('ankle', i, (g.footPitch[i] * 0.5 + legF - knee) - clamp(legF - knee, -0.7, 0.5) * 0.85, w);
+        W('legAbd', i, 0.1, w);
+        W('armFwd', i, ARM_MEAN + 0.55 + (g.armFwd[i] + g.lean - ARM_MEAN) * 1.1 * k, w);
+        W('armAbd', i, 0.12, w);
+        W('elbow', i, 1.5, w);
+      }
+      W('bodyY', undefined, -0.16 - 0.04 * k + g.bodyY * this.legLen * 0.6, w);
+      W('lean', undefined, 0.42, w);
+      W('twist', undefined, g.twist * 0.5, w);
+      W('hipTwist', undefined, g.hipTwist * 0.5, w);
     }
     if (wSide > 0) {
       // a captured defensive shuffle (low, wide, step out and close), mirrored going left

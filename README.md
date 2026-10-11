@@ -146,6 +146,6 @@ has the scripts that measure the clips and regenerate them.
 
 - No client-side prediction yet, so the guest's player feels a little delayed above ~100 ms ping.
 - Running, the defensive shuffle, leaping and hurdling, getting up off the turf, the kick and one
-  of the touchdown celebrations are motion-captured (CMU database); dives, tackles, tumbles, the
-  backpedal and the throw are procedural.
+  of the touchdown celebrations are motion-captured (CMU database), and the backpedal is the
+  captured jog run backwards; dives, tackles, tumbles and the throw are procedural.
 - Two teams, 21 offensive and 9 defensive plays.
