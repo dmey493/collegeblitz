@@ -452,9 +452,10 @@ export class PlayerModel {
         const landed = v.y <= 0.002 && st > 0.13;
         T.tiltX = 0.5 + 1.02 * launch;
         T.lean = 0.04;
-        T.headX = -0.75 * launch;
+        // eyes up on the target (or the ball), the neck extended
+        T.headX = -1.05 * launch;
         T.legFwd = [-0.12 - 0.25 * (1 - launch), 0.1 * (1 - launch) - 0.22];
-        T.knee = [0.2 + 0.5 * (1 - launch), 0.45];
+        T.knee = [0.2 + 0.5 * (1 - launch), 0.4];
         T.ankle = [0.9, 0.9];
         T.legAbd = [0.08, 0.12];
         if (v.hug) {
@@ -491,7 +492,14 @@ export class PlayerModel {
           T.armAbd = [0.6, 0.6];
           T.elbow = [0.4, 0.4];
         }
-        if (landed) T.bodyY = -0.84;
+        if (landed) {
+          // sliding on the belly: legs flat on the turf, toes pointed
+          T.bodyY = -0.84;
+          T.knee = [0.12, 0.2];
+          T.legFwd = [-0.08, -0.04];
+          T.ankle = [1.0, 1.0];
+          T.headX = -0.7;
+        }
         else if (this.vy > 0.2 || st < 0.13) T.bodyY = -0.32 * launch;
         else T.bodyY = lerpA(-0.84, -0.32, clamp(v.y / 0.32, 0, 1));
         rate = landed ? 14 : 24;
@@ -506,8 +514,9 @@ export class PlayerModel {
         T.armAbd = fwd ? [0.45, 0.75] : [1.0, 0.8];
         T.armFwd = fwd ? [2.6, 2.1] : [0.35, 0.6];
         T.elbow = [0.5, 0.9];
-        T.legFwd = fwd ? [-0.05, 0.25] : [0.4, 0.1];
-        T.knee = fwd ? [0.3, 0.7] : [0.8, 0.3];
+        // face down the legs lie flat on the turf; on the back one knee stays up
+        T.legFwd = fwd ? [-0.06, 0.12] : [0.4, 0.1];
+        T.knee = fwd ? [0.14, 0.3] : [0.8, 0.3];
         T.ankle = [0.6, 0.6];
         T.legAbd = [0.12, 0.08];
         T.lean = 0;
