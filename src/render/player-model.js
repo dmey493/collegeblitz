@@ -38,7 +38,7 @@ function materialsFor(team, num, skinIdx, visor, envMap, grime) {
   if (!S.skin) {
     // painted muscle and face detail on top of the tone, with a little sweat sheen
     S.skin = SKINS.map((c) => new THREE.MeshStandardMaterial({
-      map: skinTexture(c), normalMap: skinNormalMap(), normalScale: new THREE.Vector2(1.1, 1.1),
+      map: skinTexture(c), normalMap: skinNormalMap(), normalScale: new THREE.Vector2(1.6, 1.6),
       vertexColors: true, roughness: 0.5, envMap, envMapIntensity: 0.35,
     }));
   }

@@ -82,7 +82,7 @@ const ballAt = (f, s) => ({ x: lerp(f.fx, f.tx, s), y: lerp(f.fy, f.ty, s) + 4 *
 // Go up for the ball: leap so the top of the jump meets it. Looks ahead for a leap (its
 // height sets its timing) that puts the ball in the hands at the top of it; receivers take
 // almost every such ball, defenders go up to knock it away. Decided once per throw.
-function leapFor(p, f) {
+export function leapFor(p, f) {
   const G = AIR_GRAVITY;
   for (let tau = JUMP_VY / G; tau >= 0.2; tau -= 0.025) {
     const s = (f.t + tau) / f.T;

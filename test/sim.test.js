@@ -196,3 +196,59 @@ test('ball carriers spin with one button, no turbo combo', () => {
   }
   assert.ok(spun, 'the spin button spins the runner');
 });
+
+function livePlay(seed = 4) {
+  const m = new Match({ teams: ['IND', 'MICH'], humans: [false, false], seed });
+  m.poss = 0;
+  m.ballOn = 30;
+  m.startPlay({ kind: 'scrimmage', off: 0, ballOn: 30, fdOn: 60, offPlayId: 'blast', defPlayId: 'safe' });
+  for (let i = 0; i < 60 * 6 && m.play.phase !== 'live'; i++) m.step(1 / 60);
+  assert.equal(m.play.phase, 'live');
+  return m;
+}
+
+test('leaps hang in the air like the arcade game', () => {
+  const m = livePlay();
+  const p = m.play.players.find((q) => q.slot === 'WR1' && q.team === 0);
+  m.play.doJump(p);
+  let top = 0;
+  let air = 0;
+  for (let i = 0; i < 120 && (p.y > 0 || p.vy > 0); i++) {
+    m.play.integrate(p, 1 / 60);
+    top = Math.max(top, p.y);
+    air += 1 / 60;
+  }
+  assert.ok(top > 1.0 && top < 1.4, `leap height ${top}`);
+  assert.ok(air > 0.7 && air < 0.95, `hang time ${air}`);
+  assert.equal(p.state, 'stand');
+});
+
+test('a dive is a flying tackle: airborne, then a belly slide, then down', () => {
+  const m = livePlay();
+  const p = m.play.players.find((q) => q.slot === 'LB1' && q.team === 1);
+  p.actCd = 0;
+  m.play.doDive(p, p.x + 4, p.z);
+  assert.equal(p.state, 'dive');
+  const x0 = p.x;
+  let air = 0;
+  for (let i = 0; i < 60 && p.y > 0; i++) {
+    m.play.integrate(p, 1 / 60);
+    air += 1 / 60;
+  }
+  assert.ok(air > 0.35 && air < 0.5, `flight ${air}`);
+  assert.ok(p.x - x0 > 3, `covers ground in the air (${p.x - x0})`);
+  assert.equal(p.state, 'dive', 'still sliding after the belly-flop');
+  for (let i = 0; i < 60 && p.state === 'dive'; i++) m.play.integrate(p, 1 / 60);
+  assert.equal(p.state, 'down');
+});
+
+test('CPU games are full of leaping catches and flying tackles', () => {
+  const m = new Match({ teams: ['IND', 'MICH'], humans: [false, false], seed: 8, rules: { quarterSec: 90 } });
+  const count = {};
+  for (let i = 0; i < 60 * 60 * 40 && m.phase !== 'final'; i++) {
+    m.step(1 / 60);
+    for (const e of m.drainEvents()) count[e.k] = (count[e.k] || 0) + 1;
+  }
+  assert.ok((count.jump || 0) >= 5, `leaps: ${count.jump}`);
+  assert.ok((count.dive || 0) >= 10, `dives: ${count.dive}`);
+});

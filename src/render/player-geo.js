@@ -409,8 +409,8 @@ function buildArm(pieces, B, J, s, tag, h, glove) {
   });
   // upper arm and forearm with the muscle groups that sell "pumped up"
   const ringsU = [
-    [-0.13, 0.092], [-0.18, 0.09, 0.2, 0.12], [-0.23, 0.087, 0.24, 0.14], [-0.27, 0.078, 0.14, 0.09], [-0.305, 0.067], [-0.33, 0.062],
-    [-0.35, 0.066, 0, 0, 0.06], [-0.38, 0.084, 0, 0, 0.2], [-0.42, 0.088, 0, 0, 0.15], [-0.47, 0.078, 0, 0, 0.06], [-0.53, 0.064], [-0.58, 0.052], [-0.615, 0.047],
+    [-0.13, 0.092], [-0.18, 0.09, 0.2, 0.12], [-0.23, 0.087, 0.24, 0.14], [-0.27, 0.08, 0.14, 0.09], [-0.305, 0.073], [-0.33, 0.07],
+    [-0.35, 0.072, 0, 0, 0.05], [-0.38, 0.083, 0, 0, 0.17], [-0.42, 0.086, 0, 0, 0.13], [-0.47, 0.078, 0, 0, 0.06], [-0.53, 0.064], [-0.58, 0.052], [-0.615, 0.047],
   ].map(([dy, r, bi = 0, tri = 0, fore = 0]) => at(dy, r, {
     mod: (a) => {
       const l = local(a);
@@ -564,7 +564,8 @@ function buildFace(skin, at, weight) {
   addGeometry(skin, g, {
     weight,
     uv: ({ p: q }) => inAtlas(SKIN_ATLAS.face, 0.5 + (q[0] - c[0]) / 0.21, 0.5 + (q[1] - c[1]) / 0.25),
-    color: ({ n }) => gray(0.72 + 0.28 * Math.max(0, n[2])),
+    // in the shadow of the helmet: darkest under the brim and at the sides
+    color: ({ n, p: q }) => gray((0.42 + 0.3 * Math.max(0, n[2])) * lerp(1, 0.6, smooth(c[1] - 0.01, c[1] + 0.07, q[1]))),
   });
   g.dispose();
 }

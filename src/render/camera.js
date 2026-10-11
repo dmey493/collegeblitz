@@ -39,7 +39,11 @@ export class CameraDirector {
       kp = 1.2;
     } else {
       const pl = s.pl;
-      const dir = pl ? pl.dir : s.pos === 0 ? 1 : -1;
+      let dir = pl ? pl.dir : s.pos === 0 ? 1 : -1;
+      // after a turnover or on a return, swing around behind whoever has the ball
+      if (pl && pl.ph === 'live' && view.ball && view.ball.state === 'held' && pl.ps !== undefined) this.liveDir = pl.ps === 0 ? 1 : -1;
+      if (pl && (pl.ph === 'live' || pl.ph === 'dead') && this.liveDir) dir = this.liveDir;
+      if (!pl || pl.ph !== 'live' && pl.ph !== 'dead') this.liveDir = 0;
       const losZ = pl ? pl.los : dir * (s.on - 50);
       const b = view.ball;
       if (!pl || pl.ph === 'lineup' || pl.ph === 'presnap' || s.ph !== 'play') {
@@ -59,18 +63,31 @@ export class CameraDirector {
         let back = 15.5;
         let ahead = 7.5;
         // once a runner is past the line the camera moves in tight on him
-        if (b.state === 'held' && dir * (b.z - losZ) > 0.5 && pl.k !== 'kickoff' && pl.k !== 'punt') {
-          h = 8.6;
-          back = 12.4;
+        const returning = pl.ps !== undefined && pl.ps !== pl.off;
+        if (b.state === 'held' && (returning || (dir * (b.z - losZ) > 0.5 && pl.k !== 'kickoff' && pl.k !== 'punt'))) {
+          h = 8;
+          back = 11.2;
           ahead = 6.5;
         }
         if (b.state === 'air' && view.flight) {
           const f = view.flight;
           const len = Math.hypot(f.tx - f.fx, f.tz - f.fz);
-          const e = Math.min(1, len / 40);
-          h += e * 6;
-          back += e * 7;
-          ahead += e * 6;
+          if (f.kind === 'pass' && len > 2) {
+            // ride the ball out, then move in on the catch (leaps and layouts fill the screen)
+            const prog = Math.min(1, Math.hypot(b.x - f.fx, b.z - f.fz) / len);
+            const e = Math.min(1, len / 40) * (1 - THREE.MathUtils.smoothstep(prog, 0.3, 0.8));
+            const tight = THREE.MathUtils.smoothstep(prog, 0.3, 0.85);
+            h = THREE.MathUtils.lerp(h, 7.2, tight) + e * 5;
+            back = THREE.MathUtils.lerp(back, 9.8, tight) + e * 6;
+            ahead = THREE.MathUtils.lerp(ahead, 5.5, tight) + e * 5;
+            fx = THREE.MathUtils.lerp(b.x, f.tx, 0.6 * tight);
+            fz = THREE.MathUtils.lerp(b.z, f.tz, 0.6 * tight);
+          } else {
+            const e = Math.min(1, len / 40);
+            h += e * 6;
+            back += e * 7;
+            ahead += e * 6;
+          }
           if (b.kind === 'kick' || b.kind === 'fg') {
             h += 4;
             back += 3;

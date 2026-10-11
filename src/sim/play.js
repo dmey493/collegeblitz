@@ -9,7 +9,7 @@ import {
 import { clamp, lerp, len, dist, turnToward, angleOf, wrapAngle } from './math.js';
 import { Player } from './player.js';
 import { FORMATIONS, OL_SPOTS, DEF_BASE_ALIGN, getPlay } from './playbook.js';
-import { runAI } from './ai.js';
+import { runAI, leapFor } from './ai.js';
 
 export const BLOCK_JOBS = new Set([
   'passBlock', 'runBlock', 'leadBlock', 'screenBlock', 'drawBlock', 'stalk', 'returnBlock', 'puntBlock', 'fgBlock', 'leadPath',
@@ -788,7 +788,7 @@ export class Play {
     // the snap is on its way to us: hold any press until the ball arrives
     if (b.state === 'air' && b.f && b.f.kind === 'snap' && b.f.to === p) return;
     if (this.poss === team && b.state !== 'loose') {
-      if (this.consume(team, 'j')) this.doJump(p);
+      if (this.consume(team, 'j')) this.leap(p);
       if (this.consume(team, 's')) {
         const f = b.state === 'air' && b.f && b.f.kind === 'pass' && b.f.intended === p ? b.f : null;
         if (f) this.doDive(p, f.tx, f.tz, f.T - f.t);
@@ -798,7 +798,7 @@ export class Play {
     } else {
       if (this.consume(team, 'a')) this.switchToNearest(team);
       const cur = this.ctrl[team];
-      if (this.consume(team, 'j')) this.doJump(cur);
+      if (this.consume(team, 'j') && cur) this.leap(cur);
       if (this.consume(team, 's') && cur) {
         const t = this.diveTarget(cur);
         if (t) this.doDive(cur, t.x, t.z);
@@ -911,6 +911,15 @@ export class Play {
     p.vy = vy;
     p.actCd = 0.5;
     this.emit({ k: 'jump', id: p.id });
+  }
+
+  // The jump button with a pass in the air: a leap sized so its top meets the ball when
+  // the timing allows one, otherwise a full-height jump.
+  leap(p) {
+    const b = this.ball;
+    const f = b.state === 'air' && b.f && b.f.kind === 'pass' && !b.f.resolved ? b.f : null;
+    const l = f ? leapFor(p, f) : null;
+    this.doJump(p, l ? l.vy : JUMP_VY);
   }
 
   // Where a defender's dive should go: at a runner ahead of him, led to where the runner
@@ -1355,8 +1364,8 @@ export class Play {
       if ((!p.upright && !diving) || p.state === 'engaged' || p === f.thrower || f.tried.has(p.id)) continue;
       const reach = diving ? 1.7 : 2.45 + p.y + (p.state === 'jump' ? 0.3 : 0);
       if (b.y > reach) continue;
-      // the ball went under a leaping player
-      if (!diving && p.y > 0.25 && b.y < p.y + 0.85) continue;
+      // the ball went under a leaping player (at the belt he can still pull it in)
+      if (!diving && p.y > 0.25 && b.y < p.y + 0.55) continue;
       const hx = diving ? p.x + Math.sin(p.face) * 0.5 : p.x;
       const hz = diving ? p.z + Math.cos(p.face) * 0.5 : p.z;
       const h = len(hx - b.x, hz - b.z);

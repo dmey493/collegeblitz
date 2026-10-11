@@ -588,9 +588,9 @@ export function uniformNormalMap(S = 512) {
   };
   const knit = canvas(4, 4);
   const kg = knit.getContext('2d');
-  kg.fillStyle = 'rgb(136,136,136)';
+  kg.fillStyle = 'rgb(134,134,134)';
   kg.fillRect(0, 0, 4, 4);
-  kg.fillStyle = 'rgb(108,108,108)';
+  kg.fillStyle = 'rgb(116,116,116)';
   kg.fillRect(1, 1, 2, 2);
   const knitPat = g.createPattern(knit, 'repeat');
   // torso: mesh, seams, folds at the tuck and under the arms
@@ -911,8 +911,8 @@ export function skinTexture(base, eyeBlack = true) {
   const c = canvas(S, S);
   const g = c.getContext('2d');
   const r = srand(base.length * 97 + parseInt(base.slice(1), 16) % 997);
-  const light = tone(base, 1.28);
-  const dark = tone(base, 0.62);
+  const light = tone(base, 1.3);
+  const dark = tone(base, 0.5);
   const deep = tone(base, 0.4);
   g.fillStyle = base;
   g.fillRect(0, 0, S, S);
@@ -922,7 +922,7 @@ export function skinTexture(base, eyeBlack = true) {
     for (const u of [0.5]) softBlob(g, ...atOf(b, u, 0.5), b.w * 0.12, b.h * 0.6, 0, dark, 0.35, 0.2);
     for (const u of [0.0, 1.0]) softBlob(g, ...atOf(b, u, 0.45), b.w * 0.05, b.h * 0.45, 0, dark, 0.25, 0.2);
   }
-  paintMuscles(g, S, light, dark, 0.55);
+  paintMuscles(g, S, light, dark, 0.85);
   {
     const b = boxOf(SKIN_ATLAS.fore, S);
     g.save();
@@ -954,18 +954,18 @@ export function skinTexture(base, eyeBlack = true) {
     for (const sx of [-1, 1]) {
       const ex = 0.5 + sx * 0.17;
       softBlob(g, ...F(ex, 0.6), b.w * 0.12, b.h * 0.07, 0, deep, 0.6, 0.3); // socket
-      g.fillStyle = '#e9e4dc';
+      g.fillStyle = '#c9c0b2';
       g.beginPath();
-      g.ellipse(...F(ex, 0.6), b.w * 0.055, b.h * 0.022, 0, 0, Math.PI * 2);
+      g.ellipse(...F(ex, 0.6), b.w * 0.042, b.h * 0.016, 0, 0, Math.PI * 2);
       g.fill();
       g.fillStyle = '#2a1a10';
       g.beginPath();
-      g.arc(...F(ex + sx * -0.008, 0.6), b.h * 0.019, 0, Math.PI * 2);
+      g.arc(...F(ex + sx * -0.006, 0.6), b.h * 0.014, 0, Math.PI * 2);
       g.fill();
       g.strokeStyle = deep;
       g.lineWidth = 2.2;
       g.beginPath();
-      g.ellipse(...F(ex, 0.607), b.w * 0.06, b.h * 0.026, 0, Math.PI * 1.05, Math.PI * 1.95);
+      g.ellipse(...F(ex, 0.605), b.w * 0.047, b.h * 0.02, 0, Math.PI * 1.05, Math.PI * 1.95);
       g.stroke();
       g.strokeStyle = '#1a120c';
       g.lineWidth = 5;
