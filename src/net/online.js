@@ -1,5 +1,6 @@
 // Online session: the server runs the Match; we send inputs and render its snapshots.
 import { SnapshotBuffer } from './buffer.js';
+import { inputMessage, inputKey } from './wire.js';
 
 export function defaultServerUrl() {
   const q = new URLSearchParams(location.search).get('server');
@@ -118,8 +119,8 @@ export class OnlineSession {
     }
     if (!this.started) return;
     this.sendT -= dt;
-    const msg = { t: 'in', mx: Math.round(input.mx * 100) / 100, my: Math.round(input.my * 100) / 100, tb: input.turbo ? 1 : 0, a: input.a, j: input.j };
-    const key = `${msg.mx},${msg.my},${msg.tb},${msg.a},${msg.j}`;
+    const msg = inputMessage(input);
+    const key = inputKey(msg);
     if (key !== this.lastSent || this.sendT <= 0) {
       this.lastSent = key;
       this.sendT = 0.1;

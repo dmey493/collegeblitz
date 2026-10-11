@@ -5,7 +5,7 @@ import { offenseDiagram, defenseDiagram } from './diagram.js';
 import { downText, spotText } from './hud.js';
 
 export class PlaySelect {
-  constructor({ teams, myTeam, snap, onPick, onMove, lastPage = 0 }) {
+  constructor({ teams, myTeam, snap, onPick, onMove, lastPage = 0, labels = { move: 'ARROWS', pass: 'F' } }) {
     this.teams = teams;
     this.team = teams[myTeam];
     this.myTeam = myTeam;
@@ -27,7 +27,7 @@ export class PlaySelect {
     this.pager = h('div.ps-pager');
     this.waiting = h('div.ps-wait', 'WAITING FOR OPPONENT…');
     this.el.append(this.header, this.grid, this.pager, this.waiting,
-      h('div.ps-foot', h('span', 'MOVE: ARROWS / STICK'), h('span', 'PICK: J / SPACE / (A)'), this.pages.length > 1 ? h('span', 'PAGE: Q / E / BUMPERS') : null));
+      h('div.ps-foot', h('span', `MOVE: ${labels.move} / STICK`), h('span', `PICK: ${labels.pass} / ENTER / (A)`), this.pages.length > 1 ? h('span', 'PAGE: Q / E / BUMPERS') : null));
     this.render();
   }
 

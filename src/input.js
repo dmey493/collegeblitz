@@ -1,35 +1,77 @@
 // Keyboard + gamepad. Produces a per-frame game input and edge-triggered menu events.
+//
+// Two keyboard layouts, so all the buttons sit under the hand that isn't steering:
+//   ARROWS: move with the arrow keys (right hand); F pass · D jump · S spin/dive · SPACE turbo (left hand)
+//   WASD:   move with W A S D (left hand);         J pass · K jump · L spin/dive · SPACE turbo (thumb)
+// Index finger = pass, middle = jump, ring = spin/dive in both. No two-button combos.
+// When your QB has the ball, the same three keys throw to the receiver wearing that key's
+// icon, laid out left-to-right on the keyboard like the receivers are on screen.
 
-const KEYS = {
-  up: ['KeyW', 'ArrowUp'],
-  down: ['KeyS', 'ArrowDown'],
-  left: ['KeyA', 'ArrowLeft'],
-  right: ['KeyD', 'ArrowRight'],
-  action: ['Space', 'KeyJ', 'KeyC', 'Enter', 'NumpadEnter'],
-  jump: ['KeyK', 'KeyX'],
-  turbo: ['ShiftLeft', 'ShiftRight', 'KeyL', 'KeyZ'],
-  pause: ['Escape', 'KeyP'],
-  back: ['Escape', 'Backspace'],
-  pageL: ['KeyQ', 'PageUp', 'Comma'],
-  pageR: ['KeyE', 'PageDown', 'Period'],
+export const LAYOUTS = {
+  arrows: {
+    name: 'ARROWS + S D F',
+    move: { up: ['ArrowUp'], down: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'] },
+    pass: ['KeyF', 'Enter', 'NumpadEnter'],
+    jump: ['KeyD'],
+    spin: ['KeyS'],
+    icons: ['KeyS', 'KeyD', 'KeyF'],
+    labels: { move: 'ARROWS', pass: 'F', jump: 'D', spin: 'S', turbo: 'SPACE', icons: ['S', 'D', 'F'] },
+  },
+  wasd: {
+    name: 'WASD + J K L',
+    move: { up: ['KeyW'], down: ['KeyS'], left: ['KeyA'], right: ['KeyD'] },
+    pass: ['KeyJ', 'Enter', 'NumpadEnter'],
+    jump: ['KeyK'],
+    spin: ['KeyL'],
+    icons: ['KeyJ', 'KeyK', 'KeyL'],
+    labels: { move: 'W A S D', pass: 'J', jump: 'K', spin: 'L', turbo: 'SPACE', icons: ['J', 'K', 'L'] },
+  },
 };
 
-const PAD = { action: [0], jump: [1, 2], turbo: [7, 5, 3], pause: [9], back: [1], pageL: [4, 6], pageR: [5, 7] };
+const COMMON = {
+  turbo: ['Space', 'ShiftLeft', 'ShiftRight'],
+  pause: ['Escape', 'KeyP'],
+  back: ['Escape', 'Backspace'],
+  pageL: ['KeyQ', 'PageUp'],
+  pageR: ['KeyE', 'PageDown'],
+  navUp: ['ArrowUp'],
+  navDown: ['ArrowDown'],
+  navLeft: ['ArrowLeft'],
+  navRight: ['ArrowRight'],
+};
+
+// Standard gamepad mapping (Xbox layout): A pass · B jump · X spin/dive · RT/RB turbo.
+// Icon passing follows the face buttons' physical layout: X (left) · A (middle) · B (right).
+const PAD = { pass: [0], jump: [1], spin: [2], turbo: [7, 5, 6], pause: [9], back: [1], pageL: [4], pageR: [5], icons: [2, 0, 1] };
+export const PAD_LABELS = { move: 'STICK', pass: 'A', jump: 'B', spin: 'X', turbo: 'RT', icons: ['X', 'A', 'B'] };
 
 export class Input {
-  constructor() {
+  constructor(layout = 'arrows') {
     this.down = new Set();
     this.menuQ = [];
-    this.a = 0;
-    this.j = 0;
+    this.a = 0; // pass presses
+    this.j = 0; // jump presses
+    this.s = 0; // spin/dive presses
+    this.c = [0, 0, 0]; // receiver-icon presses (left, middle, right)
     this.padPrev = {};
     this.repeat = {};
-    this.usedPad = false;
     this.lastDevice = 'keyboard';
-    this.typing = false;
+    this.setLayout(layout);
     window.addEventListener('keydown', (e) => this.onKey(e, true));
     window.addEventListener('keyup', (e) => this.onKey(e, false));
     window.addEventListener('blur', () => this.down.clear());
+  }
+
+  setLayout(name) {
+    this.layoutName = LAYOUTS[name] ? name : 'arrows';
+    this.L = LAYOUTS[this.layoutName];
+    const all = [...Object.values(this.L.move).flat(), ...this.L.pass, ...this.L.jump, ...this.L.spin, ...Object.values(COMMON).flat()];
+    this.usedKeys = new Set(all);
+    this.down.clear();
+  }
+
+  labels() {
+    return this.lastDevice === 'gamepad' ? PAD_LABELS : this.L.labels;
   }
 
   isTyping(e) {
@@ -43,26 +85,34 @@ export class Input {
       return;
     }
     const c = e.code;
-    const used = Object.values(KEYS).some((list) => list.includes(c));
-    if (used) e.preventDefault();
+    if (this.usedKeys.has(c)) e.preventDefault();
     this.lastDevice = 'keyboard';
+    const L = this.L;
     if (isDown) {
       if (!e.repeat) {
-        if (KEYS.action.includes(c)) this.a++;
-        if (KEYS.jump.includes(c)) this.j++;
-        if (KEYS.action.includes(c)) this.menuQ.push('confirm');
-        if (KEYS.back.includes(c)) this.menuQ.push('back');
-        if (KEYS.pause.includes(c)) this.menuQ.push('pause');
-        if (KEYS.pageL.includes(c)) this.menuQ.push('pageL');
-        if (KEYS.pageR.includes(c)) this.menuQ.push('pageR');
+        if (L.pass.includes(c)) {
+          this.a++;
+          this.menuQ.push('confirm');
+        }
+        if (L.jump.includes(c)) this.j++;
+        if (L.spin.includes(c)) this.s++;
+        const icon = L.icons.indexOf(c);
+        if (icon >= 0) this.c[icon]++;
+        if (COMMON.back.includes(c)) this.menuQ.push('back');
+        if (COMMON.pause.includes(c)) this.menuQ.push('pause');
+        if (COMMON.pageL.includes(c)) this.menuQ.push('pageL');
+        if (COMMON.pageR.includes(c)) this.menuQ.push('pageR');
       }
-      for (const d of ['up', 'down', 'left', 'right']) if (KEYS[d].includes(c)) this.menuQ.push(d);
+      // menus: arrows always navigate; WASD too when it's the movement layout
+      const nav = { up: [...COMMON.navUp], down: [...COMMON.navDown], left: [...COMMON.navLeft], right: [...COMMON.navRight] };
+      if (this.layoutName === 'wasd') for (const d of Object.keys(nav)) nav[d].push(...L.move[d]);
+      for (const d of Object.keys(nav)) if (nav[d].includes(c)) this.menuQ.push(d);
       this.down.add(c);
     } else this.down.delete(c);
   }
 
-  held(name) {
-    return KEYS[name].some((k) => this.down.has(k));
+  heldAny(list) {
+    return list.some((k) => this.down.has(k));
   }
 
   pads() {
@@ -76,11 +126,12 @@ export class Input {
     }
   }
 
-  // Called once per frame. Returns the game input for local player 1.
+  // Called once per frame. Returns the game input for the local player.
   poll(dt) {
-    let mx = (this.held('right') ? 1 : 0) - (this.held('left') ? 1 : 0);
-    let my = (this.held('up') ? 1 : 0) - (this.held('down') ? 1 : 0);
-    let turbo = this.held('turbo');
+    const M = this.L.move;
+    let mx = (this.heldAny(M.right) ? 1 : 0) - (this.heldAny(M.left) ? 1 : 0);
+    let my = (this.heldAny(M.up) ? 1 : 0) - (this.heldAny(M.down) ? 1 : 0);
+    let turbo = this.heldAny(COMMON.turbo);
     for (const gp of this.pads()) {
       const ax = gp.axes[0] || 0;
       const ay = gp.axes[1] || 0;
@@ -101,19 +152,20 @@ export class Input {
       const now = {};
       for (let i = 0; i < gp.buttons.length; i++) now[i] = b(i);
       const pressed = (i) => now[i] && !prev[i];
-      if (PAD.action.some(pressed)) {
+      if (PAD.pass.some(pressed)) {
         this.a++;
         this.menuQ.push('confirm');
-        this.lastDevice = 'gamepad';
       }
-      if (PAD.jump.some(pressed)) {
-        this.j++;
-        this.lastDevice = 'gamepad';
-      }
+      if (PAD.jump.some(pressed)) this.j++;
+      if (PAD.spin.some(pressed)) this.s++;
+      PAD.icons.forEach((btn, k) => {
+        if (pressed(btn)) this.c[k]++;
+      });
+      if ([0, 1, 2, 3].some(pressed)) this.lastDevice = 'gamepad';
       if (PAD.back.some(pressed)) this.menuQ.push('back');
       if (PAD.pause.some(pressed)) this.menuQ.push('pause');
-      if (pressed(4)) this.menuQ.push('pageL');
-      if (pressed(5)) this.menuQ.push('pageR');
+      if (PAD.pageL.some(pressed)) this.menuQ.push('pageL');
+      if (PAD.pageR.some(pressed)) this.menuQ.push('pageR');
       // stick / dpad menu navigation with auto-repeat
       const dirs = { up: py > 0.6, down: py < -0.6, left: px < -0.6, right: px > 0.6 };
       for (const d in dirs) {
@@ -139,7 +191,7 @@ export class Input {
       mx /= l;
       my /= l;
     }
-    return { mx, my, turbo, a: this.a, j: this.j };
+    return { mx, my, turbo, a: this.a, j: this.j, s: this.s, c0: this.c[0], c1: this.c[1], c2: this.c[2] };
   }
 
   takeMenu() {

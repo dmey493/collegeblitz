@@ -3,6 +3,22 @@ import { h } from './dom.js';
 import { MenuList } from './menu.js';
 import { TEAMS } from '../sim/teams.js';
 import { logoDataURL } from '../render/textures.js';
+import { LAYOUTS, PAD_LABELS } from '../input.js';
+
+const KEY_OPTIONS = [
+  { label: 'ARROWS + S D F', value: 'arrows' },
+  { label: 'WASD + J K L', value: 'wasd' },
+];
+const PASS_OPTIONS = [
+  { label: 'RECEIVER KEYS', value: 'icons' },
+  { label: 'AIM + PASS', value: 'aim' },
+];
+
+// One-line cheat sheet for a keyboard layout.
+export function keyLine(keys) {
+  const L = (LAYOUTS[keys] || LAYOUTS.arrows).labels;
+  return `MOVE ${L.move} · PASS ${L.pass} · JUMP ${L.jump} · SPIN/DIVE ${L.spin} · TURBO ${L.turbo}`;
+}
 
 export function logoBlock(small = false) {
   return h(`div.logo${small ? '.small' : ''}`,
@@ -18,7 +34,7 @@ export function titleScreen({ onPlay, onOnline, onHowTo, onSettings, sfx }) {
     { label: 'HOW TO PLAY', onPress: onHowTo },
     { label: 'SETTINGS', onPress: onSettings },
   ], { onMove: sfx.move, onSelect: sfx.select, className: 'title-menu' });
-  const el = h('div.screen.title', logoBlock(), menu.el, h('div.press', 'ARROWS / STICK + J, SPACE OR (A)'), h('div.foot', 'MOCKUP v0.1 · INDIANA vs MICHIGAN'));
+  const el = h('div.screen.title', logoBlock(), menu.el, h('div.press', 'ARROWS + ENTER · OR STICK + (A)'), h('div.foot', 'MOCKUP v0.2 · INDIANA vs MICHIGAN'));
   return { el, handle: (e) => menu.handle(e) };
 }
 
@@ -38,7 +54,7 @@ export function teamCard(team, opts = {}) {
 }
 
 // vs-CPU setup: pick your team + game options
-export function setupScreen({ settings, onStart, onBack, sfx }) {
+export function setupScreen({ settings, onStart, onBack, onControls, sfx }) {
   const ids = Object.keys(TEAMS);
   const cards = h('div.tcards');
   const state = { team: settings.team in TEAMS ? settings.team : 'IND' };
@@ -60,42 +76,58 @@ export function setupScreen({ settings, onStart, onBack, sfx }) {
     }
   };
   const teamItem = { label: 'YOUR TEAM', kind: 'select', options: ids.map((id) => ({ label: TEAMS[id].name, value: id })), value: state.team, onChange: (v) => { state.team = v; paintCards(); } };
+  const keysHelp = h('div.keyline', keyLine(settings.keys));
   const menu = new MenuList([
     teamItem,
+    { label: 'CONTROLS', kind: 'select', options: KEY_OPTIONS, value: settings.keys, onChange: (v) => { settings.keys = v; keysHelp.textContent = keyLine(v); onControls && onControls(settings); } },
+    { label: 'PASSING', kind: 'select', options: PASS_OPTIONS, value: settings.passing, onChange: (v) => (settings.passing = v) },
     { label: 'QUARTER LENGTH', kind: 'select', options: [60, 90, 120, 180, 300].map((s) => ({ label: `${s / 60} MIN`.replace('1.5', '1:30'), value: s })), value: settings.quarterSec, onChange: (v) => (settings.quarterSec = v) },
     { label: 'FIRST DOWN', kind: 'select', options: [{ label: '30 YARDS', value: 30 }, { label: '25 YARDS', value: 25 }, { label: '10 YARDS (SIM)', value: 10 }], value: settings.fdYards, onChange: (v) => (settings.fdYards = v) },
     { label: 'CPU', kind: 'select', options: [{ label: 'ROOKIE', value: 'rookie' }, { label: 'VARSITY', value: 'varsity' }, { label: 'HEISMAN', value: 'heisman' }], value: settings.difficulty, onChange: (v) => (settings.difficulty = v) },
     { label: 'KICK OFF!', onPress: () => onStart({ ...settings, team: state.team }) },
     { label: 'BACK', onPress: onBack },
   ], { onBack, onMove: sfx.move, onSelect: sfx.select, className: 'setup-menu' });
-  menu.i = 4;
+  menu.i = 6;
   menu.paint();
   paintCards();
-  const el = h('div.screen.setup', h('div.screen-title', 'CHOOSE YOUR STATE'), cards, h('div.panel.narrow', menu.el));
+  const el = h('div.screen.setup', h('div.screen-title', 'CHOOSE YOUR STATE'), h('div.setup-row', cards, h('div.panel.narrow', menu.el, keysHelp)));
   return { el, handle: (e) => menu.handle(e) };
 }
 
-export function howToScreen({ onBack, sfx }) {
+export function howToScreen({ settings = {}, onBack, sfx }) {
   const menu = new MenuList([{ label: 'BACK', onPress: onBack }], { onBack, onSelect: sfx.select });
-  const row = (k, a, b, c) => h('tr', h('th', k), h('td', a), h('td', b), h('td', c));
+  const A = LAYOUTS.arrows.labels;
+  const W = LAYOUTS.wasd.labels;
+  const P = PAD_LABELS;
+  const cur = settings.keys === 'wasd' ? 2 : 1;
+  const cell = (i, v) => h(i === cur ? 'td.cur' : 'td', v);
+  const row = (k, a, w, p) => h('tr', h('th', k), cell(1, a), cell(2, w), cell(3, p));
+  const icons = settings.passing !== 'aim';
   const el = h('div.screen.howto',
     h('div.screen-title', 'HOW TO PLAY'),
     h('div.howto-cols',
       h('div.panel',
         h('h3', 'CONTROLS'),
         h('table.keys',
-          h('tr', h('th', ''), h('td', 'KEYBOARD'), h('td', 'ALT KEYS'), h('td', 'GAMEPAD')),
-          row('MOVE', 'W A S D', 'ARROWS', 'STICK / D-PAD'),
-          row('PASS · SNAP · SWITCH', 'J  or  SPACE', 'C', 'A'),
-          row('JUMP · HURDLE · DIVE', 'K', 'X', 'B / X'),
-          row('TURBO (HOLD)', 'L  or  SHIFT', 'Z', 'RT / RB / Y'),
-          row('PAUSE', 'ESC / P', '', 'START'))),
+          h('tr', h('th', ''), cell(1, 'ARROWS'), cell(2, 'WASD'), cell(3, 'GAMEPAD')),
+          row('MOVE', A.move, W.move, P.move),
+          row('TURBO (HOLD)', `${A.turbo} / SHIFT`, `${W.turbo} / SHIFT`, 'RT / RB'),
+          row('PASS / SWITCH', A.pass, W.pass, P.pass),
+          row('JUMP / HURDLE', A.jump, W.jump, P.jump),
+          row('SPIN / DIVE', A.spin, W.spin, P.spin),
+          row('SNAP / KICK', 'ANY', 'ANY', 'ANY'),
+          row('THROW TO', A.icons.join(' '), W.icons.join(' '), P.icons.join(' ')),
+          row('PAUSE', 'ESC / P', 'ESC / P', 'START')),
+        h('div.note', 'Change the layout under SETTINGS → CONTROLS. One hand steers, the other hand has every button: no two-button combos.')),
       h('div.panel',
         h('h3', 'MOVES'),
         h('ul',
-          h('li', h('b', 'QB: '), 'hold the stick toward a receiver and press PASS. Add TURBO for a bullet.'),
-          h('li', h('b', 'Ball carrier: '), 'TURBO+JUMP spins, PASS stiff-arms, JUMP hurdles.'),
-          h('li', h('b', 'Defense: '), 'PASS switches to the man nearest the ball. TURBO+JUMP is a dive tackle.'),
+          icons
+            ? h('li', h('b', 'QB: '), 'every receiver wears a key. Press it to throw to him (left key = left receiver). Hold TURBO for a bullet.')
+            : h('li', h('b', 'QB: '), 'steer toward a receiver to highlight him, then press PASS. Hold TURBO for a bullet.'),
+          h('li', h('b', 'Ball carrier: '), 'SPIN to juke, PASS to stiff-arm, JUMP to hurdle.'),
+          h('li', h('b', 'Receiver: '), 'JUMP to go up for it, SPIN to dive for it (you are down where you land).'),
+          h('li', h('b', 'Defense: '), 'PASS switches to the man nearest the ball, JUMP to swat, SPIN for a dive tackle.'),
           h('li', h('b', 'Hit hard: '), 'run through people with TURBO for a big hit. Late hits are legal.'))),
       h('div.panel',
         h('h3', 'RULES'),
@@ -110,18 +142,21 @@ export function howToScreen({ onBack, sfx }) {
 }
 
 export function settingsScreen({ settings, onChange, onBack, sfx }) {
+  const keysHelp = h('div.keyline', keyLine(settings.keys));
   const onOff = (key, label) => ({
     label, kind: 'select', options: [{ label: 'ON', value: true }, { label: 'OFF', value: false }], value: settings[key],
     onChange: (v) => { settings[key] = v; onChange(settings); },
   });
   const menu = new MenuList([
+    { label: 'CONTROLS', kind: 'select', options: KEY_OPTIONS, value: settings.keys, onChange: (v) => { settings.keys = v; keysHelp.textContent = keyLine(v); onChange(settings); } },
+    { label: 'PASSING', kind: 'select', options: PASS_OPTIONS, value: settings.passing, onChange: (v) => { settings.passing = v; onChange(settings); } },
     onOff('sound', 'SOUND'),
     onOff('music', 'MENU MUSIC'),
     onOff('announcer', 'ANNOUNCER (TTS)'),
     { label: 'GRAPHICS', kind: 'select', options: [{ label: 'HIGH', value: 'high' }, { label: 'LOW (FASTER)', value: 'low' }], value: settings.quality, onChange: (v) => { settings.quality = v; onChange(settings); } },
     { label: 'BACK', onPress: onBack },
   ], { onBack, onMove: sfx.move, onSelect: sfx.select });
-  const el = h('div.screen.settings', h('div.screen-title', 'SETTINGS'), h('div.panel.narrow', menu.el));
+  const el = h('div.screen.settings', h('div.screen-title', 'SETTINGS'), h('div.panel.narrow', menu.el, keysHelp));
   return { el, handle: (e) => menu.handle(e) };
 }
 

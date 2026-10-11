@@ -1,7 +1,7 @@
 // Ball, particles, markers and other juice.
 import * as THREE from 'three';
 import { HALF_W } from '../sim/constants.js';
-import { glowTexture, labelTexture } from './textures.js';
+import { glowTexture, labelTexture, iconTexture, ICON_COLORS } from './textures.js';
 
 // ------------------------------------------------------------------ ball
 export function makeBall() {
@@ -314,12 +314,33 @@ export class Markers {
     tg.userData = { cone, tring };
     this.target = tg;
     this.group.add(tg);
+    // receiver pass icons (left / middle / right key)
+    this.iconTex = new Map();
+    this.icons = [0, 1, 2].map(() => {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ depthTest: false, transparent: true }));
+      sp.scale.set(1.25, 1.25, 1);
+      sp.renderOrder = 22;
+      sp.visible = false;
+      sp.userData = { key: '' };
+      this.group.add(sp);
+      return sp;
+    });
     // ball shadow
     this.ballShadow = new THREE.Mesh(new THREE.CircleGeometry(0.28, 16), new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.35, depthWrite: false }));
     this.ballShadow.rotation.x = -Math.PI / 2;
     this.ballShadow.position.y = 0.02;
     this.group.add(this.ballShadow);
     this.t = 0;
+  }
+
+  setIcon(n, label, round) {
+    const sp = this.icons[n];
+    const key = `${label}|${round ? 1 : 0}|${n}`;
+    if (sp.userData.key === key) return;
+    sp.userData.key = key;
+    if (!this.iconTex.has(key)) this.iconTex.set(key, iconTexture(label, ICON_COLORS[n], round));
+    sp.material.map = this.iconTex.get(key);
+    sp.material.needsUpdate = true;
   }
 
   setTeamColors(teamIdx, color) {
@@ -332,5 +353,6 @@ export class Markers {
     for (const c of this.ctrl) c.userData.ring.scale.setScalar(pulse);
     this.target.userData.cone.rotation.y += dt * 4;
     this.target.userData.cone.position.y = 2.95 + Math.sin(this.t * 6) * 0.12;
+    for (let n = 0; n < 3; n++) this.icons[n].userData.bob = Math.sin(this.t * 5 + n * 1.3) * 0.1;
   }
 }

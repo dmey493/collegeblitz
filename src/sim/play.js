@@ -15,6 +15,11 @@ export const BLOCK_JOBS = new Set([
 ]);
 const SOLID_STATES = new Set(['stand', 'engaged', 'spin', 'stiff', 'jump', 'hurdle', 'throw', 'catch', 'stumble', 'stance', 'celebrate', 'kneel', 'kick']);
 const TIMED_STATES = new Set(['spin', 'stiff', 'throw', 'catch', 'stumble', 'kick']);
+// How long a press stays live. Receiver-icon presses wait longer so a throw pressed while the
+// snap is still in the air goes out as soon as the quarterback has the ball.
+const PRESS_WINDOW = 0.16;
+const ICON_WINDOW = 0.35;
+const newBuf = () => ({ a: 0, j: 0, s: 0, i: [0, 0, 0] });
 
 export class Play {
   constructor(match, spec) {
@@ -49,7 +54,8 @@ export class Play {
     this.revealT = 0;
     this.ctrl = [null, null];
     this.target = [null, null];
-    this.buf = [{ a: 0, j: 0 }, { a: 0, j: 0 }];
+    this.buf = [newBuf(), newBuf()];
+    this.icons = null; // receiver ids wearing the left / middle / right pass icons
     this.blockTargets = new Map();
     this.nextBlockAssign = 0;
     this.kickInfo = null;
@@ -99,6 +105,8 @@ export class Play {
       for (const s of ['QB', 'C', 'LG', 'RG', 'WR1', 'WR2', 'RB']) mk(o, s);
       for (const s of DEF_SLOTS) mk(d, s);
       this.placeScrimmage();
+      this.rbStays = this.backStaysIn();
+      this.icons = this.assignIcons();
     } else if (this.kind === 'punt') {
       for (const s of ['K', 'C', 'LG', 'RG', 'WR1', 'WR2', 'RB']) mk(o, s);
       for (const s of DEF_SLOTS) mk(d, s);
@@ -113,6 +121,42 @@ export class Play {
       this.placeKickoff();
     }
     this.initControl();
+  }
+
+  // The back stays in to pick up a blitz when the defense sends more than the line can block.
+  backStaysIn() {
+    const P = this.offPlay;
+    if (!P || P.type !== 'pass' || P.screen || !P.routes.RB || !this.defPlay) return false;
+    const rushers = DEF_SLOTS.filter((sl) => this.defPlay.a[sl].t === 'rush').length;
+    return rushers > 3 && Math.abs(this.F(this.slot[this.off].RB.home).dx) < 4;
+  }
+
+  // Pass icons go to the route runners left to right as the offense sees them, matching the
+  // three keys / face buttons left to right. Two receivers take the outside keys, one takes the middle.
+  assignIcons() {
+    const P = this.offPlay;
+    if (!P || P.type !== 'pass') return null;
+    const o = this.slot[this.off];
+    const recs = ['WR1', 'WR2', 'RB'].filter((sl) => P.routes[sl] && !(sl === 'RB' && this.rbStays)).map((sl) => o[sl]);
+    recs.sort((a, b) => this.F(a.home).dx - this.F(b.home).dx);
+    const order = recs.length >= 3 ? [0, 1, 2] : recs.length === 2 ? [0, 2] : [1];
+    const ids = [-1, -1, -1];
+    recs.slice(0, 3).forEach((r, k) => {
+      ids[order[k]] = r.id;
+    });
+    return ids;
+  }
+
+  iconReceiver(n) {
+    if (!this.icons) return null;
+    let id = this.icons[n];
+    if (id < 0) {
+      // a lone receiver answers to any of the keys
+      const live = this.icons.filter((x) => x >= 0);
+      if (live.length === 1) id = live[0];
+    }
+    const r = id >= 0 ? this.byId.get(id) : null;
+    return r && (r.job === 'route' || r.job === 'catchBall') ? r : null;
   }
 
   setHome(p, spot, faceDownfield = p.team === this.off) {
@@ -282,16 +326,19 @@ export class Play {
   step(dt, inputs, presses) {
     this.t += dt;
     for (const team of [0, 1]) {
-      if (presses[team].a) this.buf[team].a = 0.16;
-      if (presses[team].j) this.buf[team].j = 0.16;
+      const pr = presses[team];
+      const bf = this.buf[team];
+      for (const k of ['a', 'j', 's']) if (pr[k]) bf[k] = PRESS_WINDOW;
+      if (pr.c) for (let n = 0; n < 3; n++) if (pr.c[n]) bf.i[n] = ICON_WINDOW;
     }
     if (this.phase === 'lineup') this.stepLineup(dt);
     else if (this.phase === 'presnap') this.stepPresnap(dt, inputs);
     else if (this.phase === 'live') this.stepLive(dt, inputs);
     else if (this.phase === 'dead') this.stepDead(dt, inputs);
     for (const team of [0, 1]) {
-      this.buf[team].a = Math.max(0, this.buf[team].a - dt);
-      this.buf[team].j = Math.max(0, this.buf[team].j - dt);
+      const bf = this.buf[team];
+      for (const k of ['a', 'j', 's']) bf[k] = Math.max(0, bf[k] - dt);
+      for (let n = 0; n < 3; n++) bf.i[n] = Math.max(0, bf.i[n] - dt);
     }
   }
 
@@ -301,6 +348,30 @@ export class Play {
       return true;
     }
     return false;
+  }
+
+  // Any button at all (used for the snap and the kick). Clears everything so the same press
+  // can't also throw or jump a moment later.
+  anyPress(team) {
+    const bf = this.buf[team];
+    const hit = bf.a > 0 || bf.j > 0 || bf.s > 0 || bf.i.some((v) => v > 0);
+    bf.a = 0;
+    bf.j = 0;
+    bf.s = 0;
+    bf.i.fill(0);
+    return hit;
+  }
+
+  // First live receiver-icon press, if any.
+  iconPress(team) {
+    const bf = this.buf[team];
+    for (let n = 0; n < 3; n++) {
+      if (bf.i[n] <= 0) continue;
+      bf.i[n] = 0;
+      const r = this.iconReceiver(n);
+      if (r) return r;
+    }
+    return null;
   }
 
   stepLineup(dt) {
@@ -357,17 +428,15 @@ export class Play {
     // offense snap
     let go = false;
     if (this.m.human[o] && this.ctrl[o] !== null && this.kind !== 'fg' && this.kind !== 'pat') {
-      if (this.consume(o, 'a') && this.presnapT > 0.2) go = true;
-      if (this.presnapT > 12) go = true;
-    } else if (this.m.human[o] && this.kind === 'kickoff') {
-      if (this.consume(o, 'a') && this.presnapT > 0.2) go = true;
-      if (this.presnapT > 6) go = true;
+      if (this.anyPress(o) && this.presnapT > 0.2) go = true;
+      if (this.presnapT > (this.kind === 'kickoff' ? 6 : 12)) go = true;
     } else if (this.presnapT > (this.kind === 'scrimmage' || this.kind === 'two' ? this.cpuSnapAt : 0.9)) go = true;
-    if (this.m.human[o] && (this.kind === 'kickoff' || this.kind === 'punt') && this.consume(o, 'a') && this.presnapT > 0.2) go = true;
 
     // human defender can cycle and shuffle around before the snap
     if (this.m.human[d] && (this.kind === 'scrimmage' || this.kind === 'two')) {
       if (this.consume(d, 'a')) this.cycleDefender(d);
+      this.consume(d, 'j');
+      this.consume(d, 's');
       const p = this.ctrl[d];
       if (p) {
         const inp = inputs[d];
@@ -415,6 +484,7 @@ export class Play {
       if (p.state === 'stance') p.setState('stand');
       p.nextThink = 0;
     }
+    for (const team of [0, 1]) this.anyPress(team);
     this.emit({ k: 'snap', kind: this.kind });
     const o = this.slot[this.off];
     if (this.kind === 'kickoff') {
@@ -480,11 +550,8 @@ export class Play {
         o[s].job = P.screen ? 'screenBlock' : 'passBlock';
         o[s].jd = { anchor: this.W(this.F(o[s].home).dx, -1.6), side: P.screen || 0 };
       }
-      // the back stays in to pick up a blitz when the defense sends more than the line can block
-      const rushers = DEF_SLOTS.filter((sl) => this.defPlay.a[sl].t === 'rush').length;
-      const rbStays = rushers > 3 && !P.screen && P.routes.RB && Math.abs(this.F(o.RB.home).dx) < 4;
       for (const s of ['WR1', 'WR2', 'RB']) {
-        if (P.routes[s] && !(s === 'RB' && rbStays)) {
+        if (P.routes[s] && !(s === 'RB' && this.rbStays)) {
           o[s].job = 'route';
           o[s].route = this.routeFrom(o[s], P.routes[s]);
         } else {
@@ -662,6 +729,15 @@ export class Play {
       if (mag > 0.15) {
         p.ix = (wx / l) * mag;
         p.iz = (wz / l) * mag;
+        if (p.job === 'qbPass' && p.jd) p.jd.steered = true;
+      } else if (p.job === 'qbPass' && p.jd && !p.jd.steered && this.liveT < p.jd.dropEnd + 0.2) {
+        // hands off the controls: take the drop like a real quarterback until the player steers
+        const dx = p.jd.drop.x - p.x;
+        const dz = p.jd.drop.z - p.z;
+        const d = len(dx, dz);
+        const m = d > 0.05 ? Math.min(1, d / 0.8) : 0;
+        p.ix = d > 0.05 ? (dx / d) * m : 0;
+        p.iz = d > 0.05 ? (dz / d) * m : 0;
       } else {
         p.ix = 0;
         p.iz = 0;
@@ -671,37 +747,58 @@ export class Play {
     }
   }
 
+  // One job per button, no two-button combos:
+  //   ball carrier      pass = stiff-arm · jump = hurdle · spin = spin move
+  //   QB behind the line, icons: each key throws to the receiver wearing it (turbo = bullet)
+  //   QB behind the line, aim:   pass = throw to the highlighted receiver · jump = hurdle · spin = spin
+  //   defense / loose ball: pass = switch to the man nearest the ball · jump = jump · spin = dive
+  //   offense without the ball: jump = jump for the pass · spin = dive at it
   humanActions(team, p, inp) {
     const b = this.ball;
     const hasBall = b.state === 'held' && b.carrier === p;
     if (hasBall) {
-      if (this.canPass(p)) {
-        this.updateTarget(team, p, inp);
-        if (this.consume(team, 'a') && this.target[team]) {
-          this.throwPass(p, this.target[team], !!inp.turbo);
-          return;
+      if (this.canPass(p) && this.offPlay && this.offPlay.type === 'pass') {
+        if (inp.pm === 'aim') {
+          this.updateTarget(team, p, inp);
+          if (this.consume(team, 'a') && this.target[team]) {
+            this.throwPass(p, this.target[team], !!inp.turbo);
+            return;
+          }
+          if (this.consume(team, 'j')) this.doHurdle(p);
+          if (this.consume(team, 's')) this.doSpin(p);
+        } else {
+          this.target[team] = null;
+          const rec = this.iconPress(team);
+          // the action keys double as the icon keys back here, so they never stiff-arm or spin
+          this.consume(team, 'a');
+          this.consume(team, 'j');
+          this.consume(team, 's');
+          if (rec) this.throwPass(p, rec, !!inp.turbo);
         }
-      } else {
-        this.target[team] = null;
-        if (this.consume(team, 'a')) this.doStiffArm(p);
+        return;
       }
-      if (this.consume(team, 'j')) {
-        if (inp.turbo) this.doSpin(p);
-        else this.doHurdle(p);
-      }
+      this.target[team] = null;
+      if (this.consume(team, 'a')) this.doStiffArm(p);
+      if (this.consume(team, 'j')) this.doHurdle(p);
+      if (this.consume(team, 's')) this.doSpin(p);
       return;
     }
     this.target[team] = null;
+    // the snap is on its way to us: hold any press until the ball arrives
+    if (b.state === 'air' && b.f && b.f.kind === 'snap' && b.f.to === p) return;
     if (this.poss === team && b.state !== 'loose') {
       if (this.consume(team, 'j')) this.doJump(p);
+      if (this.consume(team, 's')) {
+        const f = b.state === 'air' && b.f && b.f.kind === 'pass' && b.f.intended === p ? b.f : null;
+        if (f) this.doDive(p, f.tx, f.tz, f.T - f.t);
+        else this.doDive(p);
+      }
       this.consume(team, 'a');
     } else {
       if (this.consume(team, 'a')) this.switchToNearest(team);
       const cur = this.ctrl[team];
-      if (this.consume(team, 'j')) {
-        if (inp.turbo) this.doDive(cur);
-        else this.doJump(cur);
-      }
+      if (this.consume(team, 'j')) this.doJump(cur);
+      if (this.consume(team, 's')) this.doDive(cur);
     }
   }
 
@@ -810,10 +907,12 @@ export class Play {
     this.emit({ k: 'jump', id: p.id });
   }
 
-  doDive(p, tx, tz) {
+  // tx/tz: dive at a spot; T: when the ball gets there, so the lunge is paced to meet it
+  doDive(p, tx, tz, T) {
     if (!p || !p.upright || p.state === 'engaged' || p.actCd > 0 || p.y > 0.05) return;
     let fx = Math.sin(p.face);
     let fz = Math.cos(p.face);
+    let sp = Math.max(p.speed, 6.5) * 1.18;
     if (tx !== undefined) {
       const dx = tx - p.x;
       const dz = tz - p.z;
@@ -821,12 +920,12 @@ export class Play {
       fx = dx / d;
       fz = dz / d;
       p.face = angleOf(fx, fz);
+      if (T !== undefined) sp = clamp((d - 0.5) / clamp(T, 0.2, 0.42), 2.5, 9.5);
     } else if (p.speed > 1) {
       fx = p.vx / p.speed;
       fz = p.vz / p.speed;
       p.face = angleOf(fx, fz);
     }
-    const sp = Math.max(p.speed, 6.5) * 1.18;
     p.vx = fx * sp;
     p.vz = fz * sp;
     p.vy = 3.2;
@@ -1218,11 +1317,15 @@ export class Play {
     if (b.y > 3.6 || b.y < 0.15) return;
     const cands = [];
     for (const p of this.players) {
-      if (!p.upright || p.state === 'engaged' || p === f.thrower || f.tried.has(p.id)) continue;
-      const reach = 2.45 + p.y + (p.state === 'jump' ? 0.3 : 0);
+      // a diving player is laid out low and long: more reach along the ground, none up high
+      const diving = p.state === 'dive' && p.st < 0.42;
+      if ((!p.upright && !diving) || p.state === 'engaged' || p === f.thrower || f.tried.has(p.id)) continue;
+      const reach = diving ? 1.7 : 2.45 + p.y + (p.state === 'jump' ? 0.3 : 0);
       if (b.y > reach) continue;
-      const h = len(p.x - b.x, p.z - b.z);
-      const rad = (p.state === 'jump' ? 1.2 : 0.95) + (f.intended === p ? 0.15 : 0);
+      const hx = diving ? p.x + Math.sin(p.face) * 0.5 : p.x;
+      const hz = diving ? p.z + Math.cos(p.face) * 0.5 : p.z;
+      const h = len(hx - b.x, hz - b.z);
+      const rad = (p.state === 'jump' ? 1.2 : diving ? 1.3 : 0.95) + (f.intended === p ? 0.15 : 0);
       if (h < rad) cands.push({ p, h });
     }
     if (!cands.length) return;
@@ -1241,7 +1344,7 @@ export class Play {
     if (offC) {
       f.tried.add(offC.p.id);
       const near = this.players.find((q) => q.team !== offTeam && q.upright && q.state !== 'engaged' && dist(q, offC.p) < 1.35);
-      let pc = offC.p.hands * 0.95 + 0.14 - (near ? 0.28 : 0) - offC.h * 0.08 + (offC.p.state === 'jump' ? 0.05 : 0);
+      let pc = offC.p.hands * 0.95 + 0.14 - (near ? 0.28 : 0) - offC.h * 0.08 + (offC.p.state === 'jump' ? 0.05 : 0) - (offC.p.state === 'dive' ? 0.06 : 0);
       if (f.bullet) pc -= 0.05;
       if (f.intended !== offC.p) pc -= 0.15;
       pc *= offC.p.lvl.hands;
@@ -1278,7 +1381,7 @@ export class Play {
     }
     p.job = 'carrier';
     p.jd = { gotAt: this.liveT };
-    p.setState('catch', 0.22);
+    if (p.state !== 'dive') p.setState('catch', 0.22);
     this.passCaught = p;
     this.reveal();
     this.onPossession(p, false);
@@ -1293,7 +1396,7 @@ export class Play {
     b.f = null;
     p.job = 'carrier';
     p.jd = { gotAt: this.liveT };
-    p.setState('catch', 0.22);
+    if (p.state !== 'dive') p.setState('catch', 0.22);
     p.gotInOwnEZ = dirOf(p.team) * p.z <= -GOAL;
     this.turnoverType = 'int';
     this.reveal();
@@ -1565,7 +1668,9 @@ export class Play {
     const passPro = o.job === 'passBlock' || o.job === 'fgBlock' || o.job === 'puntBlock' || o.job === 'screenBlock' || o.job === 'drawBlock';
     const base = passPro ? this.rng.range(1.5, 3.3) : this.rng.range(1.0, 2.4);
     const mult = clamp(0.85 + (o.str - d.str) * 1.4, 0.45, 1.5);
-    return base * mult * d.lvl.shed;
+    // a blitzing backer or safety picked up by a lineman slips him quicker than a tackle would
+    const quick = passPro && d.pos !== 'DL' ? 0.62 : 1;
+    return base * mult * quick * d.lvl.shed;
   }
 
   releaseEngagement(p) {
@@ -1768,8 +1873,10 @@ export class Play {
     let ax = tvx - p.vx;
     let az = tvz - p.vz;
     const al = len(ax, az);
-    let acc = p.acc * (p.turboOn ? 1.2 : 1) * (human ? 1.25 : 1);
-    if (p.vx * tvx + p.vz * tvz < 0) acc *= 1.6;
+    // the player you steer gets an arcade edge: quicker off the mark, stops and cuts on a dime
+    let acc = p.acc * (p.turboOn ? 1.2 : 1) * (human ? 1.5 : 1);
+    if (p.vx * tvx + p.vz * tvz < 0) acc *= human ? 1.9 : 1.6;
+    else if (human && tvx === 0 && tvz === 0) acc *= 1.4;
     const maxDv = acc * dt;
     if (al > maxDv) {
       ax = (ax / al) * maxDv;
@@ -1783,9 +1890,11 @@ export class Play {
     const sp = p.speed;
     if (st !== 'spin') {
       let target = null;
-      if (sp > 0.8) target = angleOf(p.vx, p.vz);
+      // a quarterback dropping or drifting back keeps his eyes downfield
+      if (p.job === 'qbPass' && this.dir * p.vz < -0.4) target = angleOf(p.vx * 0.35, this.dir);
+      else if (sp > 0.8) target = angleOf(p.vx, p.vz);
       else if (len(p.ix, p.iz) > 0.1) target = angleOf(p.ix, p.iz);
-      if (target !== null) p.face = turnToward(p.face, target, 13 * dt);
+      if (target !== null) p.face = turnToward(p.face, target, (human ? 18 : 13) * dt);
     }
     // jumping
     if (p.y > 0 || p.vy > 0) {
@@ -1840,6 +1949,11 @@ export class Play {
   // ------------------------------------------------------------- tackling
   checkTackles() {
     const c = this.ball.carrier;
+    if (c && this.ball.state === 'held' && c.state === 'down') {
+      // college rules: a runner who hits the ground is down, touched or not (diving catches)
+      this.carrierDown(c, c.x, c.z);
+      return;
+    }
     if (!c || this.ball.state !== 'held' || !(c.upright || c.state === 'dive')) return;
     if (c.state === 'kneel') return;
     for (const d of this.players) {
@@ -2072,7 +2186,8 @@ export class Play {
       p.wantTurbo = !!inp.turbo;
       p.humanDriven = true;
       this.consume(team, 'a');
-      if (this.consume(team, 'j') && inp.turbo) this.doDive(p);
+      this.consume(team, 'j');
+      if (this.consume(team, 's')) this.doDive(p);
       for (const q of this.players) {
         if (q.team === team || !q.upright || this.lateHits.has(q.id)) continue;
         const reach = p.r + q.r + (p.state === 'dive' ? 0.5 : 0.1);

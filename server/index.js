@@ -13,6 +13,7 @@ import { WebSocketServer } from 'ws';
 import { Match } from '../src/sim/match.js';
 import { TEAMS } from '../src/sim/teams.js';
 import { HZ } from '../src/sim/constants.js';
+import { inputFromMessage } from '../src/net/wire.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.resolve(__dirname, '..', 'dist');
@@ -193,7 +194,7 @@ function handle(conn, m) {
       if (!room || !room.match) return undefined;
       const i = room.players.indexOf(conn);
       if (i < 0) return undefined;
-      room.match.setInput(i, { mx: m.mx, my: m.my, turbo: !!m.tb, a: m.a, j: m.j });
+      room.match.setInput(i, inputFromMessage(m));
       return undefined;
     }
     case 'cmd': {

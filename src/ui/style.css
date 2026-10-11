@@ -65,12 +65,14 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; color: var(--gold)
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 18px;
   padding: 24px 16px;
   background: radial-gradient(ellipse at 50% 40%, rgba(5, 7, 13, 0.25), rgba(5, 7, 13, 0.82) 75%);
   overflow-y: auto;
 }
+/* centred when it fits, scrollable from the top when it doesn't */
+.screen::before, .screen::after { content: ''; flex: 0 0 0; margin: auto 0; }
 .screen.enter, .playselect.enter, .patchoice.enter { animation: fadeIn 0.28s ease-out both; }
 @keyframes fadeIn { from { opacity: 0; transform: scale(1.03); } to { opacity: 1; transform: none; } }
 .screen-title { font-size: clamp(34px, 6vw, 64px); letter-spacing: 1px; transform: skewX(-8deg); line-height: 1; }
@@ -164,9 +166,12 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; color: var(--gold)
 .rv { text-align: right; color: var(--gold); }
 .tblurb { font-size: 13px; color: rgba(255, 255, 255, 0.8); text-align: center; margin-top: 4px; }
 .setup .menu, .lobby .menu { min-width: min(520px, 92vw); }
+.setup-row { width: 100%; display: flex; gap: 26px; align-items: center; justify-content: center; flex-wrap: wrap; }
 
 /* ------------------------------------------------------------ how to */
-.howto-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; width: min(1100px, 100%); }
+.howto-cols { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 16px; width: min(1180px, 100%); }
+.howto > .menu { width: min(420px, 92vw); min-width: 0; }
+@media (max-width: 960px) { .howto-cols { grid-template-columns: 1fr; } }
 .howto h3 { margin: 0 0 10px; font-style: italic; font-weight: 900; letter-spacing: 2px; color: var(--gold); }
 .howto ul { margin: 0; padding-left: 18px; line-height: 1.55; font-size: 15px; font-weight: 600; }
 .howto li { margin-bottom: 6px; }
@@ -174,6 +179,10 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; color: var(--gold)
 .keys th { text-align: left; color: var(--steel); font-weight: 700; padding: 5px 6px 5px 0; letter-spacing: 1px; }
 .keys td { padding: 5px 6px; font-weight: 800; color: #fff; }
 .keys tr:first-child td { color: var(--muted); font-size: 11px; letter-spacing: 2px; }
+.keys td.cur { color: var(--gold); background: rgba(255, 212, 0, 0.08); }
+.keys tr:first-child td.cur { color: var(--gold); }
+.howto .note { margin-top: 10px; font-size: 12px; line-height: 1.45; color: var(--steel); }
+.keyline { margin-top: 10px; text-align: center; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; color: var(--steel); }
 
 /* ------------------------------------------------------------ lobby */
 .room { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; justify-content: center; }
@@ -366,6 +375,9 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; color: var(--gold)
   .menu { gap: 6px; }
   .screen-title { font-size: clamp(30px, 5vw, 48px); }
   .logo-main { font-size: clamp(80px, 15vw, 170px); }
+  .setup .tcard { width: 220px; }
+  .setup .panel.narrow { width: min(450px, 100%); }
+  .setup .menu { min-width: 0; }
 }
 
 @media (max-height: 640px) {

@@ -368,6 +368,20 @@ export class GameRenderer {
         } else g.visible = false;
       }
     }
+    // pass icons over my receivers while my quarterback can still throw
+    const icons = ctx.icons;
+    const mine = pl && view.local && view.local[pl.off];
+    const showIcons = !!(icons && mine && pl.ic && pl.cp && ctx.mode !== 'title' && s.ph === 'play');
+    const single = showIcons && pl.ic.filter((x) => x >= 0).length === 1;
+    for (let n = 0; n < 3; n++) {
+      const sp = M.icons[n];
+      const p = showIcons && pl.ic[n] >= 0 ? view.byId.get(pl.ic[n]) : null;
+      sp.visible = !!p;
+      if (!p) continue;
+      // a lone receiver answers to every key; label him with the middle one
+      M.setIcon(n, single ? icons.labels[1] : icons.labels[n], icons.round);
+      sp.position.set(p.x, 3.05 + p.y + (sp.userData.bob || 0), p.z);
+    }
     const tg = pl ? pl.tg.find((x, t) => x >= 0 && view.local && view.local[t]) : undefined;
     if (tg !== undefined && tg >= 0 && view.byId.get(tg)) {
       const p = view.byId.get(tg);

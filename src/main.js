@@ -18,7 +18,10 @@ import { titleScreen, setupScreen, howToScreen, settingsScreen, onlineScreen, lo
 
 const STORE = 'collegeblitz.settings.v1';
 function loadSettings() {
-  const base = { sound: true, music: true, announcer: true, quality: 'high', quarterSec: 120, fdYards: 30, difficulty: 'varsity', team: 'IND', name: 'PLAYER', server: defaultServerUrl() };
+  const base = {
+    sound: true, music: true, announcer: true, quality: 'high', quarterSec: 120, fdYards: 30, difficulty: 'varsity',
+    team: 'IND', name: 'PLAYER', server: defaultServerUrl(), keys: 'arrows', passing: 'icons',
+  };
   try {
     const s = JSON.parse(localStorage.getItem(STORE) || '{}');
     return { ...base, ...s, server: s.server || base.server };
@@ -33,6 +36,8 @@ function saveSettings(s) {
     /* storage unavailable: settings last for this visit only */
   }
 }
+
+const PRESS_KEYS = ['a', 'j', 's', 'c0', 'c1', 'c2'];
 
 const CALLS = {
   td: ['Touchdown!', 'He takes it to the house!', 'Six points!'],
@@ -55,7 +60,7 @@ class App {
     this.ui = document.getElementById('ui');
     this.overlayRoot = h('div.overlays');
     this.ui.append(this.overlayRoot);
-    this.input = new Input();
+    this.input = new Input(this.settings.keys);
     this.audio = new AudioEngine();
     this.audio.apply(this.settings);
     this.renderer = new GameRenderer(this.canvas, { quality: this.settings.quality });
@@ -116,9 +121,11 @@ class App {
   showSetup() {
     this.setScreen(setupScreen({
       settings: this.settings,
+      onControls: (s) => this.input.setLayout(s.keys),
       onStart: (s) => {
         Object.assign(this.settings, s);
         saveSettings(this.settings);
+        this.input.setLayout(this.settings.keys);
         this.startLocal();
       },
       onBack: () => {
@@ -130,7 +137,7 @@ class App {
   }
 
   showHowTo(back) {
-    this.setScreen(howToScreen({ onBack: () => { this.audio.uiBack(); back(); }, sfx: this.sfx }));
+    this.setScreen(howToScreen({ settings: this.settings, onBack: () => { this.audio.uiBack(); back(); }, sfx: this.sfx }));
   }
 
   showSettings() {
@@ -140,6 +147,7 @@ class App {
         saveSettings(s);
         this.audio.apply(s);
         this.renderer.setQuality(s.quality);
+        this.input.setLayout(s.keys);
       },
       onBack: () => {
         this.audio.uiBack();
@@ -326,6 +334,7 @@ class App {
         myTeam: me,
         snap: s,
         lastPage: s.pos === me ? this.psPage : 0,
+        labels: this.input.L.labels,
         onMove: this.sfx.move,
         onPick: (id, page) => {
           if (s.pos === me) this.psPage = page < 2 ? page : 0;
@@ -441,6 +450,24 @@ class App {
     }
   }
 
+  // Button presses made while a menu is up (pause, settings) must never reach the game, or the
+  // press that picks RESUME would also snap the ball. The press counters are frozen while held
+  // and re-based afterwards so the game only ever sees new presses.
+  gameInput(inp, hold) {
+    const off = (this.pressOffset ||= { a: 0, j: 0, s: 0, c0: 0, c1: 0, c2: 0 });
+    if (hold) {
+      if (!this.heldPresses) this.heldPresses = Object.fromEntries(PRESS_KEYS.map((k) => [k, inp[k] - off[k]]));
+      return { ...inp, mx: 0, my: 0, turbo: false, ...this.heldPresses };
+    }
+    if (this.heldPresses) {
+      for (const k of PRESS_KEYS) off[k] = inp[k] - this.heldPresses[k];
+      this.heldPresses = null;
+    }
+    const out = { ...inp };
+    for (const k of PRESS_KEYS) out[k] = inp[k] - off[k];
+    return out;
+  }
+
   // Test hook: advance the whole client by `sec` seconds in fixed 1/60 steps, drawing once.
   debugAdvance(sec) {
     this.manual = true;
@@ -456,12 +483,14 @@ class App {
   }
 
   tick(dt, skipDraw) {
-    let inp = { mx: 0, my: 0, turbo: false, a: this.input.a, j: this.input.j };
+    const I = this.input;
+    let inp = { mx: 0, my: 0, turbo: false, a: I.a, j: I.j, s: I.s, c0: I.c[0], c1: I.c[1], c2: I.c[2] };
     try {
-      inp = this.input.poll(dt);
+      inp = I.poll(dt);
     } catch (err) {
       console.error(err);
     }
+    inp.pm = this.settings.passing === 'aim' ? 'aim' : 'icons';
     const evts = this.input.takeMenu();
     try {
       if (this.mode === 'game' && this.session) {
@@ -476,7 +505,7 @@ class App {
           if (this.paused && this.screen) this.screen.handle(e);
           else if (this.overlay) this.overlay.handle(e);
         }
-        if (this.session) this.session.update(dt, this.paused ? { mx: 0, my: 0, turbo: false, a: inp.a, j: inp.j } : inp);
+        if (this.session) this.session.update(dt, this.gameInput(inp, this.paused));
         const { view, events } = this.session ? this.session.sample(dt) : { view: null, events: [] };
         if (view) {
           this.lastView = view;
@@ -484,9 +513,10 @@ class App {
           this.hud.onEvents(events, view);
           this.sounds(events, view);
           if (!this.paused) this.syncOverlays(view);
-          this.hud.update(view, dt, { device: this.input.lastDevice, ping: this.session && this.session.kind === 'online' ? this.ping : undefined });
+          this.hud.update(view, dt, { labels: I.labels(), passing: this.settings.passing, ping: this.session && this.session.kind === 'online' ? this.ping : undefined });
         }
-        this.renderer.render(view, this.paused && this.session && this.session.kind === 'local' ? 0 : dt, { mode: 'game', skipDraw });
+        const icons = this.settings.passing === 'aim' ? null : { labels: I.labels().icons, round: I.lastDevice === 'gamepad' };
+        this.renderer.render(view, this.paused && this.session && this.session.kind === 'local' ? 0 : dt, { mode: 'game', skipDraw, icons });
       } else {
         const list = evts.includes('pause') ? evts.filter((e) => e !== 'pause') : evts;
         for (const e of list) if (this.screen) this.screen.handle(e);

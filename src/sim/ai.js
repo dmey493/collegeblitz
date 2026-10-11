@@ -304,6 +304,13 @@ function passBlock(play, p) {
     uz /= ul;
     let tx = t.x + ux * 0.9;
     let tz = t.z + uz * 0.9;
+    // a rusher looping around a pile: drop into the pocket and meet him on his way to the passer
+    if (t.state !== 'engaged' && pathBlocked(play, p, tx, tz)) {
+      const dq = len(t.x - protect.x, t.z - protect.z);
+      const r = clamp(dq - 0.9, 1.2, 2.4);
+      tx = protect.x - ux * r;
+      tz = protect.z - uz * r;
+    }
     // hold the pocket: never chase past the line, never drift far from home
     const maxZ = play.losZ - play.dir * 0.6;
     if (play.dir * (tz - maxZ) > 0) tz = maxZ;
@@ -316,6 +323,25 @@ function passBlock(play, p) {
     }
     seek(p, tx, tz, 0.25);
   } else seek(p, anchor.x, anchor.z, 0.8, 0.6);
+}
+
+// Is there an engaged pile between p and the spot he wants?
+function pathBlocked(play, p, tx, tz) {
+  const dx = tx - p.x;
+  const dz = tz - p.z;
+  const L = len(dx, dz);
+  if (L < 0.5) return false;
+  const ux = dx / L;
+  const uz = dz / L;
+  for (const q of play.players) {
+    if (q === p || q.state !== 'engaged') continue;
+    const rx = q.x - p.x;
+    const rz = q.z - p.z;
+    const along = rx * ux + rz * uz;
+    if (along < 0.2 || along > L) continue;
+    if (Math.abs(rx * uz - rz * ux) < p.r + q.r) return true;
+  }
+  return false;
 }
 
 function protecteeOf(play, p) {

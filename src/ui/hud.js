@@ -204,26 +204,28 @@ export class HUD {
     this.turbo.querySelector('.turbo-fill').style.width = `${Math.round((fire ? 1 : s.tb[t]) * 100)}%`;
     this.turbo.classList.toggle('show', s.ph === 'play' || s.ph === 'playSelect');
 
-    // context hint
+    // context hint, spelled with whatever keys / buttons this player is using
     let hint = '';
-    if (pl && s.ph === 'play' && view.local && view.local[t]) {
+    const L = ctx.labels;
+    if (L && pl && s.ph === 'play' && view.local && view.local[t]) {
       const me = pl.ctl[t];
       const carrier = view.ball && view.ball.carrier;
+      const scrim = pl.k === 'scrimmage' || pl.k === 'two';
+      const icons = ctx.passing !== 'aim';
+      const any = L.icons.join(' / ');
       if (pl.ph === 'presnap') {
-        if (pl.off === t && (pl.k === 'scrimmage' || pl.k === 'two')) hint = 'SNAP: J / SPACE / (A)';
-        else if (pl.off === t && pl.k === 'kickoff') hint = 'KICK: J / SPACE / (A)';
-        else if (pl.off !== t && (pl.k === 'scrimmage' || pl.k === 'two')) hint = 'SWITCH PLAYER: J · MOVE BEFORE THE SNAP';
+        if (pl.off === t && scrim) hint = pl.ic && icons ? `SNAP: ${any} · THEN PRESS A RECEIVER'S KEY TO THROW` : `SNAP: ${any}`;
+        else if (pl.off === t && pl.k === 'kickoff') hint = `KICK: ${any}`;
+        else if (pl.off !== t && scrim) hint = `SWITCH PLAYER: ${L.pass} · MOVE: ${L.move}`;
       } else if (pl.ph === 'live') {
-        if (carrier === me && pl.ps === t) {
-          const b = view.byId.get(me);
-          const qbBehind = pl.tg[t] >= 0;
-          hint = qbBehind ? 'PASS: J · AIM WITH STICK · +TURBO = BULLET' : 'TURBO: L/SHIFT · SPIN: TURBO+K · STIFF ARM: J · HURDLE: K';
-          if (!b) hint = '';
-        } else if (pl.ps !== t) hint = 'SWITCH: J · DIVE: TURBO+K · JUMP: K';
-        else if (view.flight && view.flight.kind === 'pass' && view.flight.intended === me && view.ball.state === 'air') hint = 'JUMP FOR IT: K';
+        if (carrier === me && pl.ps === t && view.byId.get(me)) {
+          if (pl.cp && pl.ic && pl.off === t) {
+            hint = icons ? `THROW: ${L.icons.join(' / ')} (RECEIVER'S KEY) · HOLD ${L.turbo} = BULLET` : `AIM: ${L.move} · THROW: ${L.pass} · HOLD ${L.turbo} = BULLET`;
+          } else hint = `TURBO: ${L.turbo} · STIFF ARM: ${L.pass} · HURDLE: ${L.jump} · SPIN: ${L.spin}`;
+        } else if (pl.ps !== t) hint = `SWITCH: ${L.pass} · JUMP: ${L.jump} · DIVE: ${L.spin} · TURBO: ${L.turbo}`;
+        else if (view.flight && view.flight.kind === 'pass' && view.flight.intended === me && view.ball.state === 'air') hint = `JUMP FOR IT: ${L.jump} · DIVE FOR IT: ${L.spin}`;
       }
     }
-    if (ctx.device === 'gamepad') hint = hint.replace(/J \/ SPACE \/ /g, '').replace(/\bJ\b/g, '(A)').replace(/\bK\b/g, '(B)').replace(/L\/SHIFT/g, 'RT');
     if (this.hint.textContent !== hint) this.hint.textContent = hint;
     this.hint.classList.toggle('show', !!hint);
 

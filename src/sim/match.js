@@ -11,7 +11,11 @@ import { cpuOffense, cpuDefense, cpuPat } from './cpu.js';
 
 const ORD = ['', '1ST', '2ND', '3RD', '4TH'];
 
-export const blankInput = () => ({ mx: 0, my: 0, turbo: false, a: 0, j: 0 });
+// a/j/s and c[0..2] are press counters (pass · jump · spin/dive · receiver icons); pm is the
+// passing style: 'icons' (one key per receiver) or 'aim' (steer toward a receiver, then pass).
+export const blankInput = () => ({ mx: 0, my: 0, turbo: false, a: 0, j: 0, s: 0, c: [0, 0, 0], pm: 'icons' });
+const blankSeen = () => ({ a: 0, j: 0, s: 0, c: [0, 0, 0] });
+const ACTIONS = ['a', 'j', 's'];
 
 const newStats = () => ({
   passAtt: 0, passComp: 0, passYds: 0, rushAtt: 0, rushYds: 0, tds: 0, ints: 0, fumbles: 0,
@@ -43,7 +47,7 @@ export class Match {
     this.playNo = 0;
     this.turbo = [1, 1];
     this.inputs = [blankInput(), blankInput()];
-    this.seen = [{ a: 0, j: 0 }, { a: 0, j: 0 }];
+    this.seen = [blankSeen(), blankSeen()];
     this.picks = [null, null];
     this.psT = 0;
     this.cpuPickAt = [0, 0];
@@ -89,23 +93,33 @@ export class Match {
     i.mx = clamp(+inp.mx || 0, -1, 1);
     i.my = clamp(+inp.my || 0, -1, 1);
     i.turbo = !!inp.turbo;
-    if (Number.isFinite(inp.a)) i.a = inp.a | 0;
-    if (Number.isFinite(inp.j)) i.j = inp.j | 0;
+    for (const k of ACTIONS) if (Number.isFinite(inp[k])) i[k] = inp[k] | 0;
+    for (let n = 0; n < 3; n++) {
+      const v = inp[`c${n}`];
+      if (Number.isFinite(v)) i.c[n] = v | 0;
+    }
+    if (inp.pm === 'icons' || inp.pm === 'aim') i.pm = inp.pm;
   }
 
   readPresses() {
-    const out = [{ a: false, j: false }, { a: false, j: false }];
+    const out = [];
     for (const t of [0, 1]) {
       const i = this.inputs[t];
       const s = this.seen[t];
-      if (i.a !== s.a) {
-        out[t].a = true;
-        s.a = i.a;
+      const o = { a: false, j: false, s: false, c: [false, false, false] };
+      for (const k of ACTIONS) {
+        if (i[k] !== s[k]) {
+          o[k] = true;
+          s[k] = i[k];
+        }
       }
-      if (i.j !== s.j) {
-        out[t].j = true;
-        s.j = i.j;
+      for (let n = 0; n < 3; n++) {
+        if (i.c[n] !== s.c[n]) {
+          o.c[n] = true;
+          s.c[n] = i.c[n];
+        }
       }
+      out.push(o);
     }
     return out;
   }
@@ -594,6 +608,12 @@ export class Match {
         B: [round2(b.x), round2(b.y), round2(b.z), b.state, b.carrier ? b.carrier.id : -1, b.f ? b.f.kind : ''],
         res: p.result ? { type: p.result.type, team: p.result.team, good: p.result.good, id: p.scorer ? p.scorer.id : -1 } : null,
       };
+      if (p.icons) {
+        // pass icons (left / middle / right receiver ids) and whether the QB can still throw
+        const qb = p.slot[p.off].QB;
+        s.pl.ic = p.icons;
+        s.pl.cp = p.phase === 'presnap' || p.phase === 'lineup' || (p.phase === 'live' && !!qb && p.canPass(qb));
+      }
       if (b.f) s.pl.F = [round2(b.f.fx), round2(b.f.fz), round2(b.f.tx), round2(b.f.tz), b.f.intended ? b.f.intended.id : -1, b.f.kind];
     }
     return s;

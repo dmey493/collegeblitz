@@ -119,3 +119,80 @@ test('human picks and two-point tries are honored', () => {
   assert.equal(m.phase, 'play');
   assert.equal(m.play.kind, 'two');
 });
+
+// Drive one human-quarterbacked pass play; `act(play, press)` fires buttons by name.
+function humanPassPlay(offPlayId, defPlayId, act, seed = 7) {
+  const m = new Match({ teams: ['IND', 'MICH'], humans: [true, false], seed });
+  m.poss = 0;
+  m.ballOn = 30;
+  m.startPlay({ kind: 'scrimmage', off: 0, ballOn: 30, fdOn: 60, offPlayId, defPlayId });
+  const play = m.play;
+  const inp = { mx: 0, my: 0, turbo: false, a: 0, j: 0, s: 0, c0: 0, c1: 0, c2: 0, pm: 'icons' };
+  const press = (k) => inp[k]++;
+  const events = [];
+  for (let i = 0; i < 60 * 12 && !play.finished; i++) {
+    act(play, press, inp);
+    m.setInput(0, inp);
+    m.step(1 / 60);
+    events.push(...m.drainEvents());
+  }
+  return { m, play, events };
+}
+
+test('receiver icons go left to right and each key throws to its own receiver', () => {
+  for (const [n, key] of [[0, 'c0'], [1, 'c1'], [2, 'c2']]) {
+    let target = null;
+    const { play, events } = humanPassPlay('curls', 'safe', (p, press) => {
+      if (p.phase === 'presnap' && p.presnapT > 0.3 && !p.snapped) {
+        p.snapped = true;
+        press('s'); // any button snaps
+      }
+      if (p.phase === 'live' && p.liveT > 1.2 && !target) {
+        target = p.icons[n];
+        press(key);
+      }
+    });
+    const xs = play.icons.filter((id) => id >= 0).map((id) => play.F(play.byId.get(id).home).dx);
+    assert.deepEqual(xs, [...xs].sort((a, b) => a - b), 'icons are ordered left to right');
+    const thrown = events.find((e) => e.k === 'throw');
+    assert.ok(thrown, `key ${key} should throw`);
+    assert.equal(thrown.to, target);
+  }
+});
+
+test('a single press snaps the ball and never also throws it', () => {
+  const { events } = humanPassPlay('curls', 'safe', (p, press) => {
+    if (p.phase === 'presnap' && p.presnapT > 0.3 && !p.snapped) {
+      p.snapped = true;
+      press('a');
+      press('c2'); // the pass key doubles as the right-hand icon key
+    }
+  });
+  assert.ok(events.some((e) => e.k === 'snap'));
+  assert.ok(!events.some((e) => e.k === 'throw'), 'the snap press must not throw');
+});
+
+test('ball carriers spin with one button, no turbo combo', () => {
+  const m = new Match({ teams: ['IND', 'MICH'], humans: [true, false], seed: 3 });
+  m.poss = 0;
+  m.ballOn = 30;
+  m.startPlay({ kind: 'scrimmage', off: 0, ballOn: 30, fdOn: 60, offPlayId: 'blast', defPlayId: 'safe' });
+  const play = m.play;
+  const inp = { mx: 0, my: 1, turbo: false, a: 0, j: 0, s: 0, c0: 0, c1: 0, c2: 0 };
+  let spun = false;
+  for (let i = 0; i < 60 * 8 && !play.finished; i++) {
+    if (play.phase === 'presnap' && play.presnapT > 0.3 && !play.snapped) {
+      play.snapped = true;
+      inp.j++;
+    }
+    if (play.phase === 'live' && play.ball.carrier === play.ctrl[0] && play.liveT > 1 && !play.spinPressed) {
+      play.spinPressed = true;
+      inp.s++;
+      inp.c0++;
+    }
+    m.setInput(0, inp);
+    m.step(1 / 60);
+    if (m.drainEvents().some((e) => e.k === 'spin')) spun = true;
+  }
+  assert.ok(spun, 'the spin button spins the runner');
+});

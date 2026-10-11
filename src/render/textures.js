@@ -373,6 +373,48 @@ export function labelTexture(text, color, bg = 'rgba(0,0,0,0)') {
   return tex(c, { aniso: 1 });
 }
 
+// Receiver pass icon: a keycap for keyboard players, a round face button for gamepads.
+export const ICON_COLORS = ['#2f86ff', '#27c24c', '#ff3b3b'];
+export function iconTexture(text, color, round = false) {
+  const S = 128;
+  const c = canvas(S, S);
+  const g = c.getContext('2d');
+  const path = () => {
+    g.beginPath();
+    if (round) g.arc(64, 64, 50, 0, Math.PI * 2);
+    else g.roundRect(14, 14, 100, 100, 22);
+  };
+  g.shadowColor = 'rgba(0,0,0,0.6)';
+  g.shadowBlur = 10;
+  path();
+  g.fillStyle = color;
+  g.fill();
+  g.shadowBlur = 0;
+  // glossy top + dark rim
+  const sheen = g.createLinearGradient(0, 14, 0, 114);
+  sheen.addColorStop(0, 'rgba(255,255,255,0.45)');
+  sheen.addColorStop(0.5, 'rgba(255,255,255,0.05)');
+  sheen.addColorStop(1, 'rgba(0,0,0,0.25)');
+  path();
+  g.fillStyle = sheen;
+  g.fill();
+  g.lineWidth = 7;
+  g.strokeStyle = 'rgba(255,255,255,0.95)';
+  path();
+  g.stroke();
+  const t = String(text);
+  g.font = `italic 900 ${t.length > 2 ? 38 : t.length > 1 ? 50 : 66}px ${FONT}`;
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.lineWidth = 8;
+  g.lineJoin = 'round';
+  g.strokeStyle = 'rgba(0,0,0,0.55)';
+  g.strokeText(t, 64, 69);
+  g.fillStyle = '#ffffff';
+  g.fillText(t, 64, 69);
+  return tex(c, { aniso: 1 });
+}
+
 export class Scoreboard {
   constructor(teams) {
     this.teams = teams;
