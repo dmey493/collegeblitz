@@ -6,7 +6,7 @@ import { blobTexture, uniformTexture, uniformNormalMap, helmetTexture, skinTextu
 import { BODY, buildBones, buildPlayerGeometry, rigSpec } from './player-geo.js';
 import { GAITS } from './gait.js';
 import { CLIPS } from './clips.js';
-import { GETUP_TIME } from '../sim/constants.js';
+import { GETUP_TIME, AIR_GRAVITY, JUMP_VY, HURDLE_VY } from '../sim/constants.js';
 
 const SKINS = ['#f1c7a3', '#d9a476', '#b97c4f', '#8a5636', '#5d3a25', '#ebb995'];
 
@@ -188,6 +188,7 @@ export class PlayerModel {
     this.oneHand = -1;
     this.leapStyle = 0;
     this.diveStyle = 0;
+    this.airT = 0.8;
   }
 
   // view: { x, z, y, face, vx, vz, state, st, turbo, fallFwd, carrying, reach, ball }
@@ -208,6 +209,12 @@ export class PlayerModel {
     this.reachHint = !!(v.ball || v.carrying);
     this.lastFallFwd = !!v.fallFwd;
     this.seed = ctx.celebrateSeed || 0;
+    // time this leap will spend in the air, from how high it is after how long (the sim's
+    // leaps vary in height to meet the ball)
+    if ((s === 'jump' || s === 'hurdle') && st > 0.03 && st < 0.2 && v.y > 0.02) {
+      const vy0 = v.y / st + 0.5 * AIR_GRAVITY * st;
+      this.airT = clamp((2 * vy0) / AIR_GRAVITY, 0.3, 1.0);
+    }
     // where the ball is relative to the way he faces (+ = his left), for turning to it
     this.ballRel = v.ball ? wrap(Math.atan2(v.ball.x - v.x, v.ball.z - v.z) - v.face) : 0;
     if (s !== this.prevState) this.enter(s, this.prevState);
@@ -334,74 +341,60 @@ export class PlayerModel {
         break;
       }
       case 'jump': {
-        // explode up, hands reaching, then the legs come down to land. Three ways up:
-        // 0 high-point with both hands driving a knee, 1 a one-handed stab with the body
-        // twisting to the ball and the legs scissoring, 2 skying with the heels tucked
-        const lead = this.id % 2;
+        // A leap for the ball. Three ways up: 0 a captured running leap (one knee driving,
+        // the trail leg kicking back) reaching with both hands, 1 the same leap with a
+        // one-handed stab, the body twisting to the ball, 2 skying with the heels tucked
         const up = ease(Math.min(1, st / 0.12));
-        const rising = this.vy > -0.5;
         const style = this.leapStyle;
         const side = this.ballRel >= 0 ? 1 : 0; // arm on the ball's side
         const turn = clamp(this.ballRel * 0.7, -1.1, 1.1);
-        T.legFwd = [0, 0];
-        T.knee = [0, 0];
-        T.ankle = [0.6, 0.6];
-        T.legAbd = [0.05, 0.05];
-        T.armFwd = [2.85, 2.85];
-        T.armAbd = [0.12, 0.12];
-        T.elbow = [0.25, 0.25];
-        T.lean = -0.06;
-        T.headX = -0.3;
-        // turn the shoulders (and the eyes) to a ball coming over a shoulder
-        T.twist = turn;
-        T.headY = turn * 0.5;
-        if (style === 1) {
-          this.oneHand = side;
-          T.armFwd[1 - side] = 0.5;
-          T.armAbd[1 - side] = 1.25;
-          T.elbow[1 - side] = 0.5;
-          T.tiltZ = (side ? -0.32 : 0.32) * up;
-          T.legFwd[lead] = 0.9 * up;
-          T.knee[lead] = 1.2 * up;
-          T.legFwd[1 - lead] = -0.55 * up;
-          T.knee[1 - lead] = 1.25 * up;
-          T.twist = turn + (side ? 0.35 : -0.35);
-        } else if (style === 2) {
+        if (style === 2) {
+          const rising = this.vy > -0.5;
           T.legFwd = [-0.3 * up, -0.2 * up];
           T.knee = [1.75 * up, 1.6 * up];
           T.ankle = [0.75, 0.75];
           T.legAbd = [0.12, 0.12];
           T.lean = -0.28 * up;
           T.headX = -0.45;
-        } else {
-          T.legFwd[lead] = 1.05 * up;
-          T.knee[lead] = 1.55 * up;
-          T.legFwd[1 - lead] = -0.2;
-          T.knee[1 - lead] = 0.3;
-        }
-        if (!rising) {
-          T.legFwd = [0.35, 0.3];
-          T.knee = [0.5, 0.4];
-          T.ankle = [0.25, 0.25];
-          T.lean = 0.12;
-          T.headX = -0.1;
-          if (v.y < 0.25) {
-            T.knee = [0.8, 0.7];
-            T.bodyY = -0.06;
+          if (!rising) {
+            T.legFwd = [0.35, 0.3];
+            T.knee = [0.5, 0.4];
+            T.ankle = [0.25, 0.25];
+            T.lean = 0.12;
+            T.headX = -0.1;
+            if (v.y < 0.25) T.knee = [0.8, 0.7];
           }
+        } else {
+          this.playLeap(T, st);
+          T.headX = -0.3;
         }
-        rate = 20;
+        T.armFwd = [2.85, 2.85];
+        T.armAbd = [0.12, 0.12];
+        T.armTwist = [0, 0];
+        T.elbow = [0.25, 0.25];
+        // turn the shoulders (and the eyes) to a ball coming over a shoulder
+        T.twist = turn + (style === 2 ? 0 : T.twist * 0.4);
+        T.headY = turn * 0.5;
+        if (style === 1) {
+          this.oneHand = side;
+          T.armFwd[1 - side] = 0.5;
+          T.armAbd[1 - side] = 1.25;
+          T.elbow[1 - side] = 0.5;
+          T.tiltZ += (side ? -0.32 : 0.32) * up;
+          T.twist += side ? 0.35 : -0.35;
+        }
+        rate = 24;
         break;
       }
       case 'hurdle': {
-        const up = ease(Math.min(1, st / 0.12));
-        T.legFwd = [1.5 * up, -0.7 * up];
-        T.knee = [0.15, 1.7 * up];
-        T.ankle = [0.1, 0.7];
-        T.armAbd = [0.9, 0.9];
-        T.armFwd = [0.6, 0.6];
-        T.lean = 0.45;
-        rate = 24;
+        // a captured running leap over the man on the ground, arms out for balance
+        this.playLeap(T, st);
+        T.armAbd = [0.75, 0.75];
+        T.armFwd = [0.7, 0.4];
+        T.elbow = [0.5, 0.5];
+        T.armTwist = [0, 0];
+        T.lean += 0.15;
+        rate = 26;
         break;
       }
       case 'spin': {
@@ -673,6 +666,7 @@ export class PlayerModel {
     // a different move each time: picked per player and per play
     const roll = (this.id * 7 + this.seed * 13 + (s === 'dive' ? 5 : 0)) % 6;
     if (s === 'jump') this.leapStyle = roll % 3;
+    if (s === 'jump' || s === 'hurdle') this.airT = s === 'jump' ? (2 * JUMP_VY) / AIR_GRAVITY : (2 * HURDLE_VY) / AIR_GRAVITY;
     if (s === 'dive') {
       this.catchDive = this.reachHint;
       this.diveStyle = roll % 2;
@@ -786,6 +780,15 @@ export class PlayerModel {
     }
     // lean into the cut
     T.tiltZ = clamp(-this.turnRate * speed * 0.022, -0.38, 0.38) * (wRun + 0.5 * wSide);
+  }
+
+  // A captured running leap (the lead leg alternates by player), stretched over this leap's
+  // own time in the air. Height comes from the sim, so the clip's hip rise is dropped.
+  playLeap(T, st) {
+    this.playClip(T, this.id % 2 ? CLIPS.leapB : CLIPS.leapA, clamp(st / this.airT, 0, 1));
+    T.bodyY = 0;
+    T.bodyX = 0;
+    T.bodyZ = 0;
   }
 
   // Pose from a motion-captured one-shot clip at u (0..1).

@@ -3,15 +3,18 @@
   # from tools/gait, with the BVH files from github.com/una-dinosauria/cmu-mocap (data/077/)
   python3 measure.py 77_16.bvh 1.4 3.7 46 > getup_front.json
   python3 measure.py 77_18.bvh 1.9 4.6 46 > getup_back.json
+  python3 measure.py 49_04.bvh 1.32 1.80 24 > leap_a.json   # (data/049/) running leaps,
+  python3 measure.py 49_05.bvh 0.41 0.92 24 > leap_b.json   # takeoff to touchdown
   python3 bake_clips.py
 """
 import json
 import os
 
-CLIPS = {'getupFront': 'getup_front.json', 'getupBack': 'getup_back.json'}
+CLIPS = {'getupFront': 'getup_front.json', 'getupBack': 'getup_back.json', 'leapA': 'leap_a.json', 'leapB': 'leap_b.json'}
 here = os.path.dirname(os.path.abspath(__file__))
 lines = ['// One-shot motion-capture clips, measured in the terms of our pose rig: getting up off',
-         '// the turf face down (CMU 77_16) and from the back (CMU 77_18). Carnegie Mellon University',
+         '// the turf face down (CMU 77_16) and from the back (CMU 77_18), and two running leaps from',
+         '// takeoff to touchdown (CMU 49_04 right knee leading, 49_05 left). Carnegie Mellon University',
          '// Graphics Lab Motion Capture Database (mocap.cs.cmu.edu; free for research and commercial',
          '// use; created with funding from NSF EIA-0196217), BVH conversion by B. Hahne. Pelvis angles',
          '// are in a frame facing the way the player ends up facing; legs are relative to the pelvis,',

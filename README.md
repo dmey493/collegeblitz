@@ -137,12 +137,13 @@ The running animation is driven by motion capture: gait cycles measured from the
 University Graphics Lab Motion Capture Database ([mocap.cs.cmu.edu](http://mocap.cs.cmu.edu/),
 free for research and commercial use; the database was created with funding from NSF
 EIA-0196217), via B. Hahne's BVH conversion. So is getting up off the turf, face down or from
-the back. The baked tables live in `src/render/gait.js` and `src/render/clips.js`; `tools/gait/`
+the back, and the legs and body of a leap for the ball or a hurdle (a captured running leap,
+stretched over the arcade hang time). The baked tables live in `src/render/gait.js` and `src/render/clips.js`; `tools/gait/`
 has the scripts that measure the clips and regenerate them.
 
 ## Known limitations of the mockup
 
 - No client-side prediction yet, so the guest's player feels a little delayed above ~100 ms ping.
-- Running and getting up off the turf are motion-captured (CMU database); leaps, dives, tackles
-  and tumbles are procedural.
+- Running, leaping and hurdling, and getting up off the turf are motion-captured (CMU database);
+  dives, tackles and tumbles are procedural.
 - Two teams, 21 offensive and 9 defensive plays.
