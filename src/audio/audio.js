@@ -6,6 +6,9 @@
 
 import { pickLine, TAKES } from './announcer.js';
 
+// calls that may cut off whatever the announcer is in the middle of
+const URGENT_CALLS = new Set(['td', 'int', 'fumble', 'safety', 'fg', 'nofg']);
+
 const NOTE = { E2: 82.41, G2: 98.0, A2: 110.0, B2: 123.47, D3: 146.83, E3: 164.81, G3: 196.0, A3: 220.0, B3: 246.94, D4: 293.66, E4: 329.63, G4: 392.0, A4: 440.0, B4: 493.88, D5: 587.33, E5: 659.25, G5: 783.99, B5: 987.77, E6: 1318.5 };
 
 export class AudioEngine {
@@ -19,6 +22,7 @@ export class AudioEngine {
     this.voiceBufs = new Map();
     this.voiceSeq = 0;
     this.voiceSrc = null;
+    this.voiceUntil = 0;
   }
 
   unlock() {
@@ -345,6 +349,8 @@ export class AudioEngine {
   // A call ('td', 'big', ...): a recorded ElevenLabs take when the line has one, otherwise the
   // browser reads it out.
   announce(key) {
+    // the quips run two or three seconds: a minor call waits its turn rather than cutting one off
+    if (this.ctx && this.t < this.voiceUntil - 0.2 && !URGENT_CALLS.has(key)) return;
     const line = pickLine(key);
     if (!line) return;
     if (line.url && this.ctx) this.playVoice(line.url, line.text);
@@ -388,6 +394,7 @@ export class AudioEngine {
       src.connect(this.voiceBus);
       src.start();
       this.voiceSrc = src;
+      this.voiceUntil = this.t + buf.duration;
     }, () => this.say(text));
   }
 

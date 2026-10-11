@@ -519,15 +519,24 @@ class App {
         case 'juke':
         case 'spin':
           A.whoosh();
-          if (e.k === 'juke' && Math.random() < 0.4) say('juke');
+          if (Math.random() < (e.k === 'juke' ? 0.45 : 0.25)) say('juke');
           break;
         case 'broken':
-        case 'stiffArmed':
           A.hit(false);
           break;
+        case 'stiffArmed':
+          A.hit(false);
+          if (Math.random() < 0.45) say('stiff');
+          break;
+        case 'deflect':
+          if (Math.random() < 0.5) say('deflect');
+          break;
         case 'downs':
+          A.turnover();
+          break;
         case 'safety':
           A.turnover();
+          say('safety');
           break;
         case 'set':
           A.crowd(0.1 + (view && view.snap && view.snap.dn >= 3 ? 0.08 : 0), 0.8);

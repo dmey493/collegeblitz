@@ -3,22 +3,27 @@
 // "Touchdown!"); tools/voice/prep.sh trims and levels a downloaded clip into that folder.
 // A line with no recording yet falls back to the browser's text-to-speech.
 
+// Short calls keep the rhythm; the rest are the arcade announcer's kind of line: irreverent,
+// over the top, and never at a loss for a comparison.
 export const CALLS = {
-  td: ['Touchdown!', 'He takes it to the house!', 'Six points!'],
-  int: ['Intercepted!', 'Picked off!'],
-  fumble: ['Fumble!', 'He coughs it up!'],
-  sack: ['Sacked!', 'Quarterback down!'],
-  big: ['What a hit!', 'Oh, he got crushed!', 'Bone crusher!', 'He felt that one!'],
-  fire: ["He's on fire!"],
-  fg: ["It's good!"],
-  nofg: ['No good!'],
-  first: ['First down!'],
-  late: ['Late hit!'],
-  noflag: ['No flag!', 'No flags in this league!', 'Interference? Not here!'],
-  juke: ['Spin move!', 'Look at that move!'],
-  grab: ['What a catch!', 'He went up and got it!', 'Unbelievable grab!'],
-  layout: ['Diving catch!', 'He laid out for it!'],
-  pile: ['Pile on!'],
+  td: ['Touchdown!', 'Touchdown! Check the end zone for survivors!', 'He went through them like a hot knife through butter!', 'Six points, and that defense is in the lost and found!'],
+  int: ['Intercepted!', 'Picked off!', 'That pass had the wrong return address!', 'He just threw a birthday present to the wrong kid!'],
+  fumble: ['Fumble!', "He's carrying it like a greased pig!", 'Butterfingers! The ball has left the building!'],
+  sack: ['Sacked!', 'Folded him up like a lawn chair!', "He's eating more turf than a lawnmower!"],
+  big: ['What a hit!', 'He just got hit by the express train!', 'That one rearranged his furniture!', "He'll be hearing birds chirp till Tuesday!", 'Somebody get that man a dental plan!'],
+  fire: ["He's on fire!", 'Call the fire marshal! This is a five-alarm blaze!', "He's cooking with gasoline now!"],
+  fg: ["It's good!", 'Split the uprights like a lumberjack!'],
+  nofg: ['No good!', 'That kick needed a GPS!'],
+  first: ['First down!', 'Move the chains! Keep that parade rolling!'],
+  late: ['Late hit!', 'The whistle is just a suggestion around here!', "After the whistle? That's just plain rude!"],
+  noflag: ['No flag!', 'No flags in this league!', 'The refs are on a coffee break!', "Interference? The rule book's in the shredder!"],
+  juke: ['He broke his ankles! Somebody bring the crutches!', 'Spun him like a ceiling fan!', 'He left him grabbing at smoke!'],
+  grab: ['What a catch!', 'He went up like that ball owed him money!', 'Snatched it out of the sky like a hungry hawk!', 'That man has glue for gloves!'],
+  layout: ['Diving catch!', 'Superman dive! Somebody find his cape!', 'He dove for it like the last donut in the box!'],
+  pile: ['Pile on!', 'Bodies stacking up like pancakes!', 'Everybody into the pool!'],
+  deflect: ['Swatted like a mosquito!', 'Get that weak stuff out of here!'],
+  safety: ['Safety! He got trapped in his own house!'],
+  stiff: ['Stiff-armed him into next week!'],
 };
 
 // the build inlines each clip as a data: URL
