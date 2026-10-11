@@ -77,7 +77,7 @@ const tmpA = new THREE.Vector3();
 
 const basePose = () => ({
   tiltX: 0, tiltZ: 0, bodyY: 0, spin: 0, lean: 0.06, twist: 0, headX: 0, hipTwist: 0,
-  armFwd: [0.12, 0.12], armAbd: [0.1, 0.1], elbow: [0.32, 0.32],
+  armFwd: [0.12, 0.12], armAbd: [0.1, 0.1], armTwist: [0, 0], elbow: [0.32, 0.32],
   legFwd: [0, 0], knee: [0.08, 0.08], ankle: [0, 0], legAbd: [0.06, 0.06],
 });
 
@@ -224,27 +224,46 @@ export class PlayerModel {
       }
       case 'throw': {
         const u = st / 0.32;
-        if (u < 0.35) {
-          T.armFwd[0] = -0.7;
+        if (u < 0.4) {
+          // wind-up: ball cocked by the ear, front shoulder and glove at the target
+          T.armFwd[0] = 0;
           T.armAbd[0] = 1.3;
-          T.elbow[0] = 1.7;
-          T.twist = -0.5;
-        } else if (u < 0.65) {
-          T.armFwd[0] = 2.3;
+          T.armTwist[0] = 1.5;
+          T.elbow[0] = 1.75;
+          T.armFwd[1] = 1.45;
+          T.armAbd[1] = 0.05;
+          T.elbow[1] = 0.35;
+          T.twist = -0.7;
+          T.lean = 0.05;
+          T.legFwd = [-0.2, 0.45];
+          T.knee = [0.35, 0.25];
+          rate = 30;
+        } else if (u < 0.7) {
+          // release over the top
+          T.armFwd[0] = 2.25;
           T.armAbd[0] = 0.5;
+          T.armTwist[0] = 0.3;
           T.elbow[0] = 0.25;
-          T.twist = 0.5;
-          rate = 40;
+          T.armFwd[1] = 0.6;
+          T.armAbd[1] = 0.3;
+          T.elbow[1] = 1.4;
+          T.twist = 0.45;
+          T.lean = 0.3;
+          T.legFwd = [-0.35, 0.4];
+          T.knee = [0.3, 0.35];
+          rate = 45;
         } else {
-          T.armFwd[0] = 1.3;
-          T.armAbd[0] = 0.2;
-          T.elbow[0] = 0.4;
-          T.twist = 0.3;
+          // follow-through across the body
+          T.armFwd[0] = 1.1;
+          T.armAbd[0] = -0.25;
+          T.elbow[0] = 0.5;
+          T.armFwd[1] = 0.4;
+          T.elbow[1] = 1.3;
+          T.twist = 0.6;
+          T.lean = 0.42;
+          T.legFwd = [-0.1, 0.3];
+          T.knee = [0.5, 0.4];
         }
-        T.armFwd[1] = 0.9;
-        T.elbow[1] = 1.2;
-        T.lean = 0.2;
-        T.legFwd = [u < 0.5 ? -0.1 : 0.35, u < 0.5 ? 0.3 : -0.2];
         break;
       }
       case 'catch': {
@@ -473,7 +492,7 @@ export class PlayerModel {
     for (const key of ['tiltX', 'tiltZ', 'bodyY', 'lean', 'twist', 'headX', 'hipTwist']) P[key] = mix(P[key], T[key]);
     P.spin = s === 'spin' ? T.spin : 0;
     for (let i = 0; i < 2; i++) {
-      for (const key of ['armFwd', 'armAbd', 'elbow', 'legFwd', 'knee', 'ankle', 'legAbd']) P[key][i] = mix(P[key][i], T[key][i]);
+      for (const key of ['armFwd', 'armAbd', 'armTwist', 'elbow', 'legFwd', 'knee', 'ankle', 'legAbd']) P[key][i] = mix(P[key][i], T[key][i]);
     }
     this.prevState = s;
 
@@ -490,7 +509,8 @@ export class PlayerModel {
     const legs = [[b.hipR, b.kneeR, b.footR], [b.hipL, b.kneeL, b.footL]];
     for (let i = 0; i < 2; i++) {
       const side = i === 0 ? -1 : 1;
-      arms[i][0].rotation.set(-P.armFwd[i], 0, side * (P.armAbd[i] + this.abd));
+      // twist about the upper arm's own axis first, then raise it out to the side, then swing
+      arms[i][0].rotation.set(-P.armFwd[i], side * P.armTwist[i], side * (P.armAbd[i] + this.abd), 'XZY');
       arms[i][1].rotation.x = -P.elbow[i];
       legs[i][0].rotation.set(-P.legFwd[i], 0, side * P.legAbd[i]);
       legs[i][1].rotation.x = P.knee[i];
@@ -544,7 +564,7 @@ export class PlayerModel {
       else T[key][i] += val * w;
     };
     for (const key of ['lean', 'twist', 'bodyY', 'headX', 'hipTwist', 'tiltZ']) T[key] = 0;
-    for (const key of ['armFwd', 'armAbd', 'elbow', 'legFwd', 'knee', 'ankle', 'legAbd']) T[key] = [0, 0];
+    for (const key of ['armFwd', 'armAbd', 'armTwist', 'elbow', 'legFwd', 'knee', 'ankle', 'legAbd']) T[key] = [0, 0];
     if (wRun > 0) {
       const run = clamp(speed / 9, 0, 1);
       const A = 0.3 + 0.55 * run + (v.turbo ? 0.1 : 0);
