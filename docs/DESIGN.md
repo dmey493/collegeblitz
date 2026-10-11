@@ -148,7 +148,8 @@ steering, the human QB takes his drop automatically.
 * **Failure motif:** the same notes descending B–G–E into a low thud (turnovers).
 * **Signature sound:** the big-hit "CRACK" followed by a crowd "OOOH".
 * **Music:** menus get a driving 140 BPM synth-rock loop; in-game is crowd ambience only.
-* Optional text-to-speech announcer for the big calls (toggle in settings).
+* Announcer for the big calls (toggle in settings): recorded takes from an ElevenLabs pro-wrestling
+  announcer voice (`src/audio/voice`), with the browser's text-to-speech for any line not yet recorded.
 
 ## 6. Architecture
 

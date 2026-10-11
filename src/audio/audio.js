@@ -1,8 +1,10 @@
-// Procedural audio — no sound files.
+// Procedural audio — no sound files, apart from the announcer's recorded calls (announcer.js).
 // AUDIO IDENTITY: packed night stadium. Timbre: mechanical impacts (pad cracks = noise + thump)
 // with brassy saw stabs. Key: E minor pentatonic (E G A B D).
 // Success = rising E-G-B-E; failure = the same notes falling into a thud.
 // Signature: the big-hit CRACK followed by the crowd's "OOOH".
+
+import { pickLine, TAKES } from './announcer.js';
 
 const NOTE = { E2: 82.41, G2: 98.0, A2: 110.0, B2: 123.47, D3: 146.83, E3: 164.81, G3: 196.0, A3: 220.0, B3: 246.94, D4: 293.66, E4: 329.63, G4: 392.0, A4: 440.0, B4: 493.88, D5: 587.33, E5: 659.25, G5: 783.99, B5: 987.77, E6: 1318.5 };
 
@@ -14,6 +16,9 @@ export class AudioEngine {
     this.crowdLevel = 0.1;
     this.lastHit = 0;
     this.voices = null;
+    this.voiceBufs = new Map();
+    this.voiceSeq = 0;
+    this.voiceSrc = null;
   }
 
   unlock() {
@@ -37,6 +42,11 @@ export class AudioEngine {
     this.musicBus = ctx.createGain();
     this.musicBus.gain.value = 0;
     this.musicBus.connect(this.master);
+    this.voiceBus = ctx.createGain();
+    this.voiceBus.gain.value = 1.15;
+    this.voiceBus.connect(this.master);
+    // decode the announcer's recorded calls up front so they fire on the frame of the play
+    for (const takes of Object.values(TAKES)) for (const url of takes) this.voiceBuffer(url).catch(() => {});
     // noise buffers
     const len = ctx.sampleRate * 2;
     this.noise = ctx.createBuffer(1, len, ctx.sampleRate);
@@ -331,12 +341,72 @@ export class AudioEngine {
     if (this.ctx) this.musicBus.gain.setTargetAtTime(0, this.t, 0.2);
   }
 
-  // ---------------------------------------------------------------- announcer (text-to-speech)
+  // ---------------------------------------------------------------- announcer
+  // A call ('td', 'big', ...): a recorded ElevenLabs take when the line has one, otherwise the
+  // browser reads it out.
+  announce(key) {
+    const line = pickLine(key);
+    if (!line) return;
+    if (line.url && this.ctx) this.playVoice(line.url, line.text);
+    else this.say(line.text);
+  }
+
+  voiceBuffer(url) {
+    let p = this.voiceBufs.get(url);
+    if (!p) {
+      p = (async () => {
+        let bytes;
+        if (url.startsWith('data:')) {
+          // inlined by the build: decode it here (the page may not be allowed to fetch data: URLs)
+          const bin = atob(url.slice(url.indexOf(',') + 1));
+          bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        } else bytes = new Uint8Array(await (await fetch(url)).arrayBuffer());
+        return this.ctx.decodeAudioData(bytes.buffer);
+      })();
+      this.voiceBufs.set(url, p);
+    }
+    return p;
+  }
+
+  playVoice(url, text) {
+    if (!this.settings.announcer || !this.settings.sound) return;
+    const id = ++this.voiceSeq;
+    this.voiceBuffer(url).then((buf) => {
+      if (id !== this.voiceSeq) return; // a newer call came in while this one decoded
+      // one announcer: a new call cuts off the last one
+      if (this.voiceSrc) {
+        try {
+          this.voiceSrc.stop();
+        } catch {
+          /* already finished */
+        }
+      }
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      const src = this.ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(this.voiceBus);
+      src.start();
+      this.voiceSrc = src;
+    }, () => this.say(text));
+  }
+
+  // fallback for lines with no recording yet (text-to-speech)
   say(text, { rate = 1.12, pitch = 0.75, interrupt = true } = {}) {
     if (!this.settings.announcer || !this.settings.sound || !window.speechSynthesis) return;
     try {
       const synth = window.speechSynthesis;
-      if (interrupt) synth.cancel();
+      if (interrupt) {
+        synth.cancel();
+        this.voiceSeq++;
+        if (this.voiceSrc) {
+          try {
+            this.voiceSrc.stop();
+          } catch {
+            /* already finished */
+          }
+        }
+      }
       const u = new SpeechSynthesisUtterance(text);
       u.rate = rate;
       u.pitch = pitch;

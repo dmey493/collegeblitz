@@ -43,23 +43,6 @@ function saveSettings(s) {
 
 const PRESS_KEYS = ['a', 'j', 's', 'c0', 'c1', 'c2'];
 
-const CALLS = {
-  td: ['Touchdown!', 'He takes it to the house!', 'Six points!'],
-  int: ['Intercepted!', 'Picked off!'],
-  fumble: ['Fumble!', 'He coughs it up!'],
-  sack: ['Sacked!', 'Quarterback down!'],
-  big: ['What a hit!', 'Oh, he got crushed!', 'Bone crusher!', 'He felt that one!'],
-  fire: ["He's on fire!"],
-  fg: ["It's good!"],
-  nofg: ['No good!'],
-  first: ['First down!'],
-  late: ['Late hit!'],
-  noflag: ['No flag!', 'No flags in this league!', 'Interference? Not here!'],
-  juke: ['Spin move!', 'Look at that move!'],
-  grab: ['What a catch!', 'He went up and got it!', 'Unbelievable grab!'],
-  layout: ['Diving catch!', 'He laid out for it!'],
-};
-
 class App {
   constructor() {
     this.settings = loadSettings();
@@ -454,7 +437,7 @@ class App {
 
   sounds(events, view) {
     const A = this.audio;
-    const say = (k) => A.say(CALLS[k][Math.floor(Math.random() * CALLS[k].length)]);
+    const say = (k) => A.announce(k);
     for (const e of events) {
       switch (e.k) {
         case 'snap':

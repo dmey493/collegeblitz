@@ -138,7 +138,7 @@ Online games use the defaults.
 src/sim/            game engine (pure JS, runs in the browser and on the server)
 src/render/         Three.js: field, stadium, skinned procedural players, effects, camera
 src/ui/             menus, HUD, play select (route diagrams drawn from the playbook)
-src/audio/          procedural Web Audio (no sound files) + optional TTS announcer
+src/audio/          procedural Web Audio + the announcer (recorded calls in src/audio/voice)
 src/net/            sessions: local (vs CPU), online client, shared game rooms,
                     WebRTC peer-to-peer, matchmaking API
 netlify/functions/  matchmaking function for Netlify (Blobs-backed)
@@ -147,7 +147,14 @@ test/               headless engine, controls and networking tests (npm test)
 ```
 
 Every texture (uniforms, helmets, field paint, crowd, state outlines), every player model and
-every sound is generated at runtime, so there are no art or audio assets to license.
+every sound effect is generated at runtime, so there are no art or sound-effect assets to license.
+
+The announcer is an ElevenLabs voice, "World Wrestling Announcer". Each call in
+`src/audio/announcer.js` can have recorded takes in `src/audio/voice/` named
+`<call>-<line>-<take>.mp3` (`td-0-0.mp3` is the first take of "Touchdown!"); the build inlines
+them and a random take plays when that call fires. A line with no recording yet is read out by
+the browser's text-to-speech. `tools/voice/prep.sh <downloaded.mp3> <name>` trims the dead air and
+levels a new take before it goes in.
 
 The running animation is driven by motion capture: gait cycles measured from the Carnegie Mellon
 University Graphics Lab Motion Capture Database ([mocap.cs.cmu.edu](http://mocap.cs.cmu.edu/),
