@@ -1,4 +1,8 @@
-// Online session: the server runs the Match; we send inputs and render its snapshots.
+// Online session: a host runs the Match (the game server, or one player's browser in
+// peer-to-peer play); we send inputs and render the snapshots it streams back.
+// The transport is anything with send(string)/close() and onopen/onmessage/onclose/onerror:
+// a WebSocket to the game server, a WebRTC data channel to the host, or (for the host
+// itself) an in-page loopback into the room it is running.
 import { SnapshotBuffer } from './buffer.js';
 import { inputMessage, inputKey } from './wire.js';
 
@@ -12,12 +16,40 @@ export function defaultServerUrl() {
   return 'ws://localhost:8787/ws';
 }
 
+export function socketTransport(url) {
+  const ws = new WebSocket(url);
+  const t = {
+    onopen: null,
+    onmessage: null,
+    onclose: null,
+    onerror: null,
+    get isOpen() {
+      return ws.readyState === 1;
+    },
+    send(text) {
+      if (ws.readyState === 1) ws.send(text);
+    },
+    close() {
+      ws.close();
+    },
+  };
+  ws.onopen = () => t.onopen && t.onopen();
+  ws.onclose = () => t.onclose && t.onclose();
+  ws.onerror = () => t.onerror && t.onerror(`Could not reach a game server at ${url}. Server play needs the College Blitz server running (npm start).`);
+  ws.onmessage = (m) => t.onmessage && t.onmessage(m.data);
+  return t;
+}
+
 export class OnlineSession {
-  constructor(url) {
+  // via: 'server' (WebSocket game server), 'host' (this browser runs the room) or 'guest'
+  constructor(transport, { minDelay = 0.07, via = 'server', peer = null } = {}) {
     this.kind = 'online';
-    this.url = url;
+    this.via = via;
+    this.peer = peer; // peer-to-peer connection, closed with the session
+    this.transport = transport;
     this.handlers = {};
-    this.buffer = new SnapshotBuffer(0.1);
+    this.minDelay = minDelay;
+    this.buffer = new SnapshotBuffer(Math.max(minDelay, 0.1));
     this.myTeam = 0;
     this.local = [false, false];
     this.info = null;
@@ -25,21 +57,26 @@ export class OnlineSession {
     this.rtt = 0;
     this.lastSent = '';
     this.sendT = 0;
-    this.pingT = 0;
     this.jitter = 0;
     this.lastArrive = 0;
     this.closed = false;
-    this.ws = new WebSocket(url);
     this.opened = false;
-    this.ws.onopen = () => {
+    transport.onopen = () => {
+      if (this.opened) return;
       this.opened = true;
       this.emit('open');
     };
-    this.ws.onclose = () => {
+    transport.onclose = () => {
+      clearInterval(this.pinger);
       if (!this.closed) this.emit('close');
     };
-    this.ws.onerror = () => this.emit('error', `Could not reach a game server at ${url}. Online play needs the College Blitz server running (npm start).`);
-    this.ws.onmessage = (m) => this.onMessage(m.data);
+    // ping on a timer rather than per frame: it keeps going in a background tab, so a
+    // peer-to-peer host doesn't mistake a tabbed-out guest for a dropped one
+    this.pinger = setInterval(() => this.opened && this.send({ t: 'ping', c: performance.now() }), 2000);
+    transport.onerror = (msg) => this.emit('error', msg);
+    transport.onmessage = (data) => this.onMessage(data);
+    // a transport that is already connected (peer-to-peer) opens once handlers are attached
+    if (transport.isOpen) setTimeout(() => transport.onopen && transport.onopen(), 0);
   }
 
   on(type, fn) {
@@ -52,7 +89,7 @@ export class OnlineSession {
   }
 
   send(obj) {
-    if (this.ws.readyState === 1) this.ws.send(JSON.stringify(obj));
+    this.transport.send(JSON.stringify(obj));
   }
 
   onMessage(raw) {
@@ -70,7 +107,8 @@ export class OnlineSession {
           this.jitter = this.jitter * 0.9 + Math.abs(gap - 1 / 30) * 0.1;
         }
         this.lastArrive = now;
-        this.buffer.delay = Math.min(0.22, Math.max(0.07, 0.06 + this.jitter * 3));
+        // render a little in the past, more on a jittery connection
+        this.buffer.delay = Math.min(0.22, Math.max(this.minDelay, this.minDelay - 0.01 + this.jitter * 3));
         this.buffer.push(m.s, m.e || []);
         break;
       }
@@ -112,11 +150,6 @@ export class OnlineSession {
   }
 
   update(dt, input) {
-    this.pingT -= dt;
-    if (this.pingT <= 0 && this.ws.readyState === 1) {
-      this.pingT = 2;
-      this.send({ t: 'ping', c: performance.now() });
-    }
     if (!this.started) return;
     this.sendT -= dt;
     const msg = inputMessage(input);
@@ -140,11 +173,13 @@ export class OnlineSession {
 
   close() {
     this.closed = true;
+    clearInterval(this.pinger);
     try {
       this.send({ t: 'leave' });
-      this.ws.close();
+      this.transport.close();
     } catch {
       /* already closed */
     }
+    if (this.peer) this.peer.close();
   }
 }

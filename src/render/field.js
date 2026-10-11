@@ -169,7 +169,8 @@ export function buildField(teams) {
 
 function goalPost(s, team) {
   const g = new THREE.Group();
-  const yellow = new THREE.MeshStandardMaterial({ color: '#ffd400', roughness: 0.35, metalness: 0.3, emissive: '#ffb000', emissiveIntensity: 0.12 });
+  // transparent so the renderer can fade the posts when the camera sits behind them
+  const yellow = new THREE.MeshStandardMaterial({ color: '#ffd400', roughness: 0.35, metalness: 0.3, emissive: '#ffb000', emissiveIntensity: 0.12, transparent: true });
   const r = 0.09;
   const baseZ = s * (END + 2.2);
   const post = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.6, r * 1.6, CROSSBAR + 0.4, 12), yellow);
@@ -184,24 +185,25 @@ function goalPost(s, team) {
   bar.position.set(0, CROSSBAR, s * END);
   g.add(bar);
   const up = 10;
+  const flagMat = new THREE.MeshBasicMaterial({ color: '#ff3b1f', side: THREE.DoubleSide, transparent: true });
   for (const x of [-POST_HALF, POST_HALF]) {
     const u = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.8, r * 0.8, up, 10), yellow);
     u.position.set(x, CROSSBAR + up / 2, s * END);
     g.add(u);
-    const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.25, 0.9), new THREE.MeshBasicMaterial({ color: '#ff3b1f', side: THREE.DoubleSide }));
+    const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.25, 0.9), flagMat);
     flag.position.set(x, CROSSBAR + up - 0.45, s * END - 0.14);
     flag.rotation.y = Math.PI / 2;
     flag.name = 'streamer';
     g.add(flag);
   }
-  const pad = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.42, 0.42, 2.2, 16),
-    new THREE.MeshStandardMaterial({ color: team.colors.primary, roughness: 0.7 }),
-  );
+  const padMat = new THREE.MeshStandardMaterial({ color: team.colors.primary, roughness: 0.7, transparent: true });
+  const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 2.2, 16), padMat);
   pad.position.set(0, 1.1, baseZ);
   g.add(pad);
   g.traverse((o) => {
     if (o.isMesh) o.castShadow = true;
   });
+  g.name = 'goalpost';
+  g.userData = { side: s, mats: [yellow, flagMat, padMat], fade: 1 };
   return g;
 }

@@ -1,7 +1,9 @@
-// College Blitz online server.
+// College Blitz game server (optional: Netlify hosting needs none of this).
 //  - Serves the built game (dist/index.html) over HTTP.
-//  - Hosts 2-player rooms over WebSocket at /ws.
-//  - Runs the authoritative Match for each room at 60 Hz and streams snapshots at 30 Hz.
+//  - Peer-to-peer matchmaking at /api (same API as the Netlify function), so "DIRECT"
+//    online play works when you self-host or run `npm run dev` alongside it.
+//  - Server-hosted rooms over WebSocket at /ws: the server runs the authoritative Match
+//    at 60 Hz and streams snapshots at 30 Hz. Pick "GAME SERVER" in the online menu.
 //
 //   npm run build && npm start        (PORT defaults to 8787)
 
@@ -10,217 +12,44 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
-import { Match } from '../src/sim/match.js';
-import { TEAMS } from '../src/sim/teams.js';
-import { HZ } from '../src/sim/constants.js';
-import { inputFromMessage } from '../src/net/wire.js';
+import { Hub } from '../src/net/room.js';
+import { handleSignal, memoryStore } from '../src/net/signal-api.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.resolve(__dirname, '..', 'dist');
 const PORT = Number(process.env.PORT || 8787);
-const MAX_ROOMS = 500;
-const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-const QUARTERS = [60, 90, 120, 180, 300];
 
-const rooms = new Map();
+const hub = new Hub({ maxRooms: 500 });
+const signals = memoryStore();
 
-function makeCode() {
-  for (let tries = 0; tries < 1000; tries++) {
-    let c = '';
-    for (let i = 0; i < 4; i++) c += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
-    if (!rooms.has(c)) return c;
-  }
-  return null;
-}
-
-const send = (ws, obj) => {
-  if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
-};
-const clean = (s, n = 12) => String(s || 'PLAYER').toUpperCase().replace(/[^A-Z0-9 _.-]/g, '').slice(0, n) || 'PLAYER';
-
-class Room {
-  constructor(code) {
-    this.code = code;
-    this.players = [null, null];
-    this.ready = [false, false];
-    this.rematch = [false, false];
-    this.lobby = { team: 'IND', rules: { quarterSec: 120, fdYards: 30 } };
-    this.match = null;
-    this.loop = null;
-    this.created = Date.now();
-  }
-
-  lobbyState() {
-    return {
-      team: this.lobby.team,
-      rules: this.lobby.rules,
-      players: this.players.map((p, i) => (p ? { name: p.name, ready: this.ready[i] } : null)),
-    };
-  }
-
-  broadcast(obj) {
-    for (const p of this.players) if (p) send(p.ws, obj);
-  }
-
-  pushLobby() {
-    this.broadcast({ t: 'lobby', lobby: this.lobbyState() });
-  }
-
-  start() {
-    const host = this.lobby.team;
-    const guest = Object.keys(TEAMS).find((id) => id !== host);
-    this.match = new Match({
-      teams: [host, guest],
-      humans: [!!this.players[0], !!this.players[1]],
-      rules: this.lobby.rules,
+function readBody(req, limit = 64 * 1024) {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks = [];
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > limit) {
+        reject(new Error('too large'));
+        req.destroy();
+      } else chunks.push(c);
     });
-    this.rematch = [false, false];
-    const info = this.match.info();
-    this.players.forEach((p, i) => p && send(p.ws, { t: 'start', info, you: i }));
-    this.runLoop();
-  }
-
-  runLoop() {
-    clearInterval(this.loop);
-    const dt = 1 / HZ;
-    let last = performance.now();
-    let acc = 0;
-    let tick = 0;
-    let pending = [];
-    this.loop = setInterval(() => {
-      const now = performance.now();
-      acc += Math.min(0.25, (now - last) / 1000);
-      last = now;
-      while (acc >= dt) {
-        acc -= dt;
-        this.match.step(dt);
-        pending.push(...this.match.drainEvents());
-        tick++;
-        if (tick % 2 === 0) {
-          const msg = JSON.stringify({ t: 's', s: this.match.snapshot(), e: pending });
-          pending = [];
-          for (const p of this.players) if (p && p.ws.readyState === 1) p.ws.send(msg);
-        }
-      }
-    }, 1000 / HZ / 2);
-  }
-
-  stop() {
-    clearInterval(this.loop);
-    this.loop = null;
-  }
-
-  leave(conn) {
-    const i = this.players.indexOf(conn);
-    if (i < 0) return;
-    this.players[i] = null;
-    this.ready[i] = false;
-    if (this.match) {
-      // keep the game going for whoever is left: the CPU takes over
-      this.match.setHuman(i, false);
-      this.broadcast({ t: 'left', slot: i });
-    } else if (i === 0) {
-      // host left the lobby: close the room
-      this.broadcast({ t: 'err', msg: 'The host left the room.' });
-      for (const p of this.players) if (p) p.room = null;
-      this.players = [null, null];
-    } else {
-      this.broadcast({ t: 'left', slot: i });
-      this.pushLobby();
-    }
-    if (!this.players[0] && !this.players[1]) this.close();
-  }
-
-  close() {
-    this.stop();
-    rooms.delete(this.code);
-  }
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('error', reject);
+  });
 }
 
-function handle(conn, m) {
-  const room = conn.room;
-  switch (m.t) {
-    case 'ping':
-      return send(conn.ws, { t: 'pong', c: m.c });
-    case 'create': {
-      if (room) room.leave(conn);
-      if (rooms.size >= MAX_ROOMS) return send(conn.ws, { t: 'err', msg: 'Server is full. Try again soon.' });
-      const code = makeCode();
-      if (!code) return send(conn.ws, { t: 'err', msg: 'Could not create a room.' });
-      const r = new Room(code);
-      rooms.set(code, r);
-      conn.name = clean(m.name);
-      conn.room = r;
-      r.players[0] = conn;
-      send(conn.ws, { t: 'room', code, slot: 0, lobby: r.lobbyState() });
-      return undefined;
-    }
-    case 'join': {
-      const code = String(m.code || '').toUpperCase();
-      const r = rooms.get(code);
-      if (!r) return send(conn.ws, { t: 'err', msg: `No room called ${code || '????'}.` });
-      if (r.match) return send(conn.ws, { t: 'err', msg: 'That game already started.' });
-      if (r.players[1]) return send(conn.ws, { t: 'err', msg: 'That room is full.' });
-      if (room) room.leave(conn);
-      conn.name = clean(m.name);
-      conn.room = r;
-      r.players[1] = conn;
-      send(conn.ws, { t: 'room', code, slot: 1, lobby: r.lobbyState() });
-      r.pushLobby();
-      return undefined;
-    }
-    case 'lobby': {
-      if (!room || room.match || room.players[0] !== conn) return undefined;
-      if (m.team in TEAMS) room.lobby.team = m.team;
-      if (m.rules) {
-        const q = Number(m.rules.quarterSec);
-        const f = Number(m.rules.fdYards);
-        if (QUARTERS.includes(q)) room.lobby.rules.quarterSec = q;
-        if (f === 25 || f === 30) room.lobby.rules.fdYards = f;
-      }
-      room.ready = [false, false];
-      room.pushLobby();
-      return undefined;
-    }
-    case 'ready': {
-      if (!room || room.match) return undefined;
-      const i = room.players.indexOf(conn);
-      room.ready[i] = !!m.ready;
-      room.pushLobby();
-      if (room.players[0] && room.players[1] && room.ready[0] && room.ready[1]) room.start();
-      return undefined;
-    }
-    case 'in': {
-      if (!room || !room.match) return undefined;
-      const i = room.players.indexOf(conn);
-      if (i < 0) return undefined;
-      room.match.setInput(i, inputFromMessage(m));
-      return undefined;
-    }
-    case 'cmd': {
-      if (!room || !room.match) return undefined;
-      const i = room.players.indexOf(conn);
-      if (i >= 0) room.match.command(i, m.cmd);
-      return undefined;
-    }
-    case 'rematch': {
-      if (!room || !room.match || room.match.phase !== 'final') return undefined;
-      const i = room.players.indexOf(conn);
-      room.rematch[i] = true;
-      const others = room.players.map((p, k) => (p ? room.rematch[k] : true));
-      if (others.every(Boolean)) {
-        room.stop();
-        room.start();
-      } else room.broadcast({ t: 'rematchWanted', slot: i });
-      return undefined;
-    }
-    case 'leave':
-      if (room) room.leave(conn);
-      conn.room = null;
-      return undefined;
-    default:
-      return undefined;
+async function api(req, res, url) {
+  let body = null;
+  try {
+    if (req.method === 'POST') body = JSON.parse((await readBody(req)) || 'null');
+  } catch {
+    res.writeHead(400, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Bad request' }));
+    return;
   }
+  const out = await handleSignal({ method: req.method, path: url.pathname, body, store: signals, env: process.env });
+  res.writeHead(out.status, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+  res.end(out.body === null ? '' : JSON.stringify(out.body));
 }
 
 // ------------------------------------------------------------------ http
@@ -228,7 +57,16 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
   if (url.pathname === '/health') {
     res.writeHead(200, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, rooms: rooms.size }));
+    res.end(JSON.stringify({ ok: true, rooms: hub.rooms.size, p2pRooms: signals.size() }));
+    return;
+  }
+  if (url.pathname.startsWith('/api/')) {
+    if (process.env.DEBUG) console.log(req.method, url.pathname);
+    api(req, res, url).catch((e) => {
+      console.error('api error', e);
+      res.writeHead(500);
+      res.end();
+    });
     return;
   }
   let file = path.normalize(path.join(DIST, url.pathname === '/' ? 'index.html' : url.pathname));
@@ -252,45 +90,43 @@ const server = http.createServer((req, res) => {
   });
 });
 
+// ------------------------------------------------------------------ websocket rooms
 const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 8 * 1024, perMessageDeflate: false });
 wss.on('connection', (ws) => {
-  const conn = { ws, name: 'PLAYER', room: null, msgs: 0, window: Date.now() };
+  const conn = hub.connect((text) => {
+    if (ws.readyState === 1) ws.send(text);
+  });
+  let msgs = 0;
+  let windowStart = Date.now();
   ws.on('message', (data) => {
     // simple flood guard
     const now = Date.now();
-    if (now - conn.window > 1000) {
-      conn.window = now;
-      conn.msgs = 0;
+    if (now - windowStart > 1000) {
+      windowStart = now;
+      msgs = 0;
     }
-    if (++conn.msgs > 240) return;
+    if (++msgs > 240) return;
     let m;
     try {
       m = JSON.parse(data);
     } catch {
       return;
     }
-    if (m && typeof m.t === 'string') {
-      try {
-        handle(conn, m);
-      } catch (e) {
-        console.error('message error', e);
-      }
+    try {
+      hub.message(conn, m);
+    } catch (e) {
+      console.error('message error', e);
     }
   });
-  ws.on('close', () => {
-    if (conn.room) conn.room.leave(conn);
-    conn.room = null;
-  });
+  ws.on('close', () => hub.disconnect(conn));
 });
 
-// clean up abandoned lobbies
+// clean up abandoned lobbies and stale matchmaking entries
 setInterval(() => {
-  const now = Date.now();
-  for (const r of rooms.values()) {
-    if (!r.match && now - r.created > 30 * 60 * 1000) r.close();
-  }
+  hub.sweep();
+  signals.sweep();
 }, 60 * 1000);
 
 server.listen(PORT, () => {
-  console.log(`College Blitz server on http://localhost:${PORT}  (WebSocket: ws://localhost:${PORT}/ws)`);
+  console.log(`College Blitz server on http://localhost:${PORT}  (WebSocket rooms: ws://localhost:${PORT}/ws, matchmaking: /api)`);
 });

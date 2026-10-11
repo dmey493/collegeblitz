@@ -1,4 +1,4 @@
-# College Blitz — Design Notes (Mockup v0.1)
+# College Blitz — Design Notes (Mockup v0.2)
 
 Working title taken from the repo name. Goal: a PC arcade college-football game that
 plays and *looks* like the early-2000s console arcade football games (GameCube era),
@@ -38,25 +38,40 @@ likeness issues).
 ## 3. Controls
 
 Screen-relative (up = away from camera; the camera always sits behind the offense like the originals).
+Keyboard rule: **one hand steers, the other hand has every button, no two-button combos**
+(the old Turbo+Jump spin and dive were impossible with the arrows on the right-hand side).
 
-| Action | Keyboard (A) | Keyboard (B) | Gamepad |
+| Action | Arrows layout (default) | WASD layout | Gamepad |
 |---|---|---|---|
-| Move | W A S D | Arrow keys | Left stick / D-pad |
-| Pass / Snap / Switch player | J or Space | C | A |
-| Jump / Hurdle / Dive | K | X | B or X |
-| Turbo (hold) | L or Shift | Z | RT / RB / Y |
-| Pause | Esc / P | | Start |
+| Move | Arrow keys | W A S D | Left stick / D-pad |
+| Turbo (hold) | Space / Shift (thumb) | Space / Shift | RT / RB |
+| Pass · switch player · stiff-arm | F (index) | J (index) | A |
+| Jump · hurdle | D (middle) | K (middle) | B |
+| Spin · dive | S (ring) | L (ring) | X |
+| Snap / kick | any of the three | any of the three | A / B / X |
+| Pause | Esc / P | Esc / P | Start |
 
-Context moves: ball carrier **Turbo+Jump = spin**, **Pass = stiff-arm**, **Jump = hurdle**.
-Defender **Turbo+Jump = dive tackle**, **Jump = leap for the ball**, **Pass = switch to the man nearest the ball**.
-The QB throws to the receiver in the direction you hold (a target marker shows who).
+**Passing:** by default every route runner wears a key icon (S D F / J K L / X A B), assigned
+left to right as the offense sees them so the keys match the screen. Pressing a receiver's key
+throws to him; turbo makes it a bullet. Two receivers take the outside keys, a lone receiver
+answers to any key. The classic *aim + pass* style (steer toward a receiver, press Pass) is a
+setting. A press made while the snap is still in the air is held until the QB has the ball.
+
+Context moves: ball carrier **Spin = spin move**, **Pass = stiff-arm**, **Jump = hurdle**.
+Receiver: **Jump** to go up for the ball, **Spin = diving catch** (paced to meet the ball;
+down where you land). Defender: **Spin = dive tackle**, **Jump = leap for the ball**,
+**Pass = switch to the man nearest the ball**. With nobody steering, the human QB takes his
+drop automatically.
 
 ## 4. Art direction ("GameCube night game")
 
 * Night stadium under 4 light towers; saturated turf with mowing stripes, crisp white paint,
   team-colored end zones with the state names, midfield state silhouette.
-* Chunky, glossy players: oversized shoulder pads and helmets, team-colored jerseys with
-  numbers front and back, specular helmets (environment-mapped).
+* Bulky, larger-than-life players: one skinned mesh each with giant domed shoulder pads, a barrel
+  chest that V-tapers to a narrow waist, thick arms and comparatively slim legs. Uniform texture
+  atlas per player (wrap-around numbers, shoulder TV numbers, sleeve stripes, belt, pants
+  stripes, striped socks, taped ankles); clear-coated helmets with stripe and state decal, cage
+  masks for linemen, two-bar masks for skill players, optional visors.
 * Big italic chrome text for every result ("FIRST DOWN!", "INTERCEPTED!", "TOUCHDOWN!").
 * Palette: team colors + near-black UI (`#0B0D12`), chrome/steel gradients, flame orange `#FF6A00`
   and gold `#FFD23F` reserved for "hot" states (fire, big plays).
@@ -82,25 +97,40 @@ src/sim/      Pure JavaScript game engine (no DOM, no Three.js). Rules, physics,
 src/render/   Three.js renderer that draws whatever snapshot it is given.
 src/ui/       DOM screens + HUD.
 src/audio/    Procedural Web Audio (no audio files).
-src/net/      Local host (vs CPU) and WebSocket client (online) — same interface.
-server/       Node + ws: rooms with 4-letter codes, runs the authoritative Match at 60 Hz.
+src/net/      Sessions with one interface: local (vs CPU) and online. Shared game rooms
+              (room.js), WebRTC peer-to-peer (p2p.js), matchmaking API (signal-api.js).
+netlify/      Matchmaking function for Netlify, rooms kept in Netlify Blobs.
+server/       Optional Node server: static files, matchmaking, WebSocket rooms.
 test/         Headless CPU-vs-CPU games for regression + balance numbers.
 ```
 
-### Online model: authoritative server
+### Online model: authoritative host, peer-to-peer
 
-1. Player A clicks **Online → Create**; the server makes a room and returns a code (e.g. `KQZX`).
-2. Player B enters the code (or opens the invite link `?join=KQZX`).
-3. A picks the team & settings, both press Ready; the server starts a `Match`.
-4. Clients send input (stick + buttons, ~60 Hz) and discrete commands (play picks, PAT choice).
-5. The server steps the simulation at 60 Hz and broadcasts compact snapshots at 30 Hz.
-6. Clients render ~70 ms in the past and interpolate between snapshots; sound/text events
-   are played when their snapshot is reached.
-7. If a player disconnects, the CPU takes over their team so the other player can finish.
+Hosting target is Netlify (static files + functions, no long-running servers), so the game
+runs on one player's machine:
 
-Why not peer-to-peer lockstep: browser float math is not guaranteed identical across engines,
-and a server avoids NAT/firewall problems. The same sim code runs on both ends, so adding
-client-side prediction for your own player later is straightforward.
+1. Player A clicks **Online → Create**. A's browser makes a WebRTC offer (ICE gathered up
+   front, public STUN, optional TURN from env vars) and posts it to `/api/rooms`, getting a
+   4-letter code (e.g. `KQZX`). The Netlify function keeps it in Netlify Blobs for 15 minutes.
+2. Player B enters the code (or opens the invite link `?join=KQZX`), fetches the offer, posts
+   an answer; A polls for it. The browsers connect directly and the record is deleted.
+3. A's browser runs a **room**: the exact same lobby / ready / match / rematch code the Node
+   server uses (`src/net/room.js`). A plays through an in-page loopback; B through the data
+   channel. A picks team and settings, both press Ready.
+4. Clients send input (stick + press counters, ~10 Hz plus on change) and discrete commands
+   (play picks, PAT choice). The host steps the simulation at 60 Hz on a worker-driven clock
+   (keeps running in a background tab) and sends compact snapshots at 30 Hz.
+5. Clients render slightly in the past (host ~35 ms, guest 70–220 ms depending on jitter) and
+   interpolate; sound/text events fire when their snapshot is reached.
+6. Heartbeats both ways: if the guest goes quiet the CPU takes over their team; if the host
+   goes quiet the guest is told the game ended.
+
+The optional Node server offers the same rooms over WebSocket ("GAME SERVER" mode), which
+avoids NAT problems entirely and keeps both players equal on latency.
+
+Why not lockstep: browser float math is not guaranteed identical across engines, so one side
+owns the simulation. The same sim code runs everywhere, so client-side prediction for your own
+player can be added later.
 
 ## 7. Roadmap after the mockup
 
@@ -108,4 +138,4 @@ client-side prediction for your own player later is straightforward.
 2. Client-side prediction for the controlled player (online feel at 100+ ms ping).
 3. More teams (state list), uniforms editor, more plays per page, audibles, onside kicks.
 4. Couch versus (2 gamepads on one PC), 2v2 online.
-5. Desktop packaging (Electron/Tauri) and a hosted server for matchmaking.
+5. Desktop packaging (Electron/Tauri).

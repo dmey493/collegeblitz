@@ -161,20 +161,36 @@ export function settingsScreen({ settings, onChange, onBack, sfx }) {
 }
 
 export function onlineScreen({ settings, prefillCode, onCreate, onJoin, onBack, sfx }) {
-  const state = { code: prefillCode || '', name: settings.name || 'PLAYER', server: settings.server };
+  const state = { code: prefillCode || '', name: settings.name || 'PLAYER', server: settings.server, via: settings.online === 'server' ? 'server' : 'direct' };
   const status = h('div.status');
+  const note = h('div.note');
+  const serverItem = { label: 'SERVER', kind: 'input', value: state.server, maxlength: 120, onChange: (v) => (state.server = v) };
+  const paintNote = () => {
+    serverItem.disabled = state.via !== 'server';
+    note.textContent = state.via === 'server'
+      ? 'Both players connect to a College Blitz game server (npm start on any machine or host), then share the room code.'
+      : 'No game server needed: whoever creates the game hosts it in their browser and the other player connects straight to them. Share the room code or the invite link.';
+  };
+  paintNote();
   const menu = new MenuList([
     { label: 'YOUR NAME', kind: 'input', value: state.name, maxlength: 12, upper: true, onChange: (v) => (state.name = v) },
+    {
+      label: 'CONNECTION', kind: 'select', value: state.via,
+      options: [{ label: 'DIRECT (P2P)', value: 'direct' }, { label: 'GAME SERVER', value: 'server' }],
+      onChange: (v) => {
+        state.via = v;
+        paintNote();
+      },
+    },
     { label: 'CREATE GAME', hint: 'GET A ROOM CODE', onPress: () => onCreate(state) },
     { label: 'ROOM CODE', kind: 'input', value: state.code, placeholder: 'ABCD', maxlength: 4, upper: true, onChange: (v) => (state.code = v) },
     { label: 'JOIN GAME', onPress: () => onJoin(state) },
-    { label: 'SERVER', kind: 'input', value: state.server, maxlength: 120, onChange: (v) => (state.server = v) },
+    serverItem,
     { label: 'BACK', onPress: onBack },
   ], { onBack, onMove: sfx.move, onSelect: sfx.select });
-  menu.i = prefillCode ? 3 : 1;
+  menu.i = prefillCode ? 4 : 2;
   menu.paint();
-  const el = h('div.screen.online', h('div.screen-title', 'PLAY ONLINE'), h('div.panel.narrow', menu.el, status),
-    h('div.note', 'Both players need the same game server. Run ', h('code', 'npm start'), ' on one machine (or a host like Render/Fly), then share the room code or invite link.'));
+  const el = h('div.screen.online', h('div.screen-title', 'PLAY ONLINE'), h('div.panel.narrow', menu.el, status), note);
   return {
     el,
     handle: (e) => menu.handle(e),
@@ -185,7 +201,7 @@ export function onlineScreen({ settings, prefillCode, onCreate, onJoin, onBack, 
   };
 }
 
-export function lobbyScreen({ code, isHost, link, onLobby, onReady, onLeave, sfx }) {
+export function lobbyScreen({ code, isHost, direct = false, link, onLobby, onReady, onLeave, sfx }) {
   const ids = Object.keys(TEAMS);
   const st = { team: 'IND', quarterSec: 120, fdYards: 30, ready: false, lobby: null };
   const cards = h('div.tcards');
@@ -234,16 +250,23 @@ export function lobbyScreen({ code, isHost, link, onLobby, onReady, onLeave, sfx
   };
   paint();
   push();
+  const status = h('div.status', direct && isHost ? 'Waiting for your opponent to join with the code…' : '');
   const el = h('div.screen.lobby',
     h('div.screen-title', 'ONLINE LOBBY'),
     h('div.room', h('span.room-label', 'ROOM CODE'), h('span.room-code', code), copyBtn),
-    cards, players, h('div.panel.narrow', menu.el));
+    cards, players, h('div.panel.narrow', menu.el, status),
+    direct && isHost ? h('div.note', 'You are hosting: the game runs in this browser, so keep this tab open until the final whistle.') : null);
   return {
     el,
     handle: (e) => menu.handle(e),
     setLobby: (lb) => {
       st.lobby = lb;
+      if (direct && isHost && lb && lb.players && lb.players[1]) status.textContent = '';
       paint();
+    },
+    setStatus: (text, bad = false) => {
+      status.textContent = text;
+      status.classList.toggle('bad', bad);
     },
   };
 }

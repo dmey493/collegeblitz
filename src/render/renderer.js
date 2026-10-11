@@ -7,7 +7,7 @@ import { PlayerModel } from './player-model.js';
 import { Effects, Markers, makeBall } from './effects.js';
 import { CameraDirector } from './camera.js';
 import { bodyOfSlot } from '../sim/player.js';
-import { ROSTER_SLOTS, playerId } from '../sim/constants.js';
+import { ROSTER_SLOTS, playerId, END } from '../sim/constants.js';
 
 const tmpV = new THREE.Vector3();
 
@@ -96,8 +96,10 @@ export class GameRenderer {
     this.scene.add(this.world);
     this.markers = new Markers(this.scene, teams);
     this.streamers = [];
+    this.goalposts = [];
     this.field.traverse((o) => {
       if (o.name === 'streamer') this.streamers.push(o);
+      if (o.name === 'goalpost') this.goalposts.push(o);
     });
   }
 
@@ -238,6 +240,16 @@ export class GameRenderer {
     this.key.position.set(look.x + 18, 48, look.z - 12);
     this.key.target.position.set(look.x, 0, look.z);
     for (const s of this.streamers || []) s.rotation.y = Math.PI / 2 + Math.sin(this.time * 4 + s.position.x) * 0.35;
+    // goal posts fade out when the camera is parked behind them (backed up near the end line)
+    for (const gp of this.goalposts || []) {
+      const u = gp.userData;
+      const behind = this.camera.position.z * u.side > END - 4;
+      u.fade += ((behind ? 0.22 : 1) - u.fade) * (1 - Math.exp(-8 * dt));
+      for (const m of u.mats) {
+        m.opacity = u.fade;
+        m.depthWrite = u.fade > 0.98;
+      }
+    }
 
     if (this.stadium) {
       this.stadium.update(dt);

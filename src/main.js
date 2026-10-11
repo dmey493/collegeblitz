@@ -10,7 +10,8 @@ import { Input } from './input.js';
 import { AudioEngine } from './audio/audio.js';
 import { GameRenderer } from './render/renderer.js';
 import { LocalSession } from './net/local.js';
-import { OnlineSession, defaultServerUrl } from './net/online.js';
+import { OnlineSession, defaultServerUrl, socketTransport } from './net/online.js';
+import { P2PHost, connectToHost } from './net/p2p.js';
 import { HUD } from './ui/hud.js';
 import { PlaySelect, PatChoice } from './ui/playselect.js';
 import { h, clear } from './ui/dom.js';
@@ -20,7 +21,7 @@ const STORE = 'collegeblitz.settings.v1';
 function loadSettings() {
   const base = {
     sound: true, music: true, announcer: true, quality: 'high', quarterSec: 120, fdYards: 30, difficulty: 'varsity',
-    team: 'IND', name: 'PLAYER', server: defaultServerUrl(), keys: 'arrows', passing: 'icons',
+    team: 'IND', name: 'PLAYER', server: defaultServerUrl(), keys: 'arrows', passing: 'icons', online: 'direct',
   };
   try {
     const s = JSON.parse(localStorage.getItem(STORE) || '{}');
@@ -82,11 +83,14 @@ class App {
     };
     window.addEventListener('pointerdown', unlock);
     window.addEventListener('keydown', unlock);
+    // closing the tab: tell the other player right away instead of letting them time out
+    window.addEventListener('pagehide', () => this.session && this.session.kind === 'online' && this.endSession());
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && this.session && this.session.kind === 'local' && this.mode === 'game' && !this.paused) this.openPause();
     });
-    const join = new URLSearchParams(location.search).get('join');
-    if (join) this.showOnline(join.toUpperCase());
+    const params = new URLSearchParams(location.search);
+    const join = params.get('join');
+    if (join) this.showOnline(join.toUpperCase(), params.get('server') ? 'server' : 'direct');
     else this.showTitle();
     this.last = performance.now();
     requestAnimationFrame((t) => this.frame(t));
@@ -157,10 +161,11 @@ class App {
     }));
   }
 
-  showOnline(prefill = '') {
+  showOnline(prefill = '', via = null) {
     this.endSession();
     this.mode = 'menu';
     this.hud.show(false);
+    if (via) this.settings.online = via;
     const scr = onlineScreen({
       settings: this.settings,
       prefillCode: prefill,
@@ -179,22 +184,79 @@ class App {
     this.setScreen(scr);
   }
 
+  // Online play, three ways: host a direct (peer-to-peer) game in this browser, join one,
+  // or use a College Blitz game server over WebSocket.
   connect(st, code) {
     this.settings.name = (st.name || 'PLAYER').slice(0, 12);
     this.settings.server = st.server || defaultServerUrl();
+    this.settings.online = st.via === 'server' ? 'server' : 'direct';
     saveSettings(this.settings);
     this.endSession();
+    if (this.settings.online === 'server') this.connectServer(code);
+    else if (code) this.joinDirect(code);
+    else this.hostDirect();
+  }
+
+  connectServer(code) {
     const scr = this.onlineScr;
     scr && scr.setStatus('Connecting…');
     let s;
     try {
-      s = new OnlineSession(this.settings.server);
+      s = new OnlineSession(socketTransport(this.settings.server), { via: 'server' });
     } catch {
       scr && scr.setStatus('That server address is not valid.', true);
       return;
     }
     this.session = s;
+    this.wireSession(s);
     s.on('open', () => (code ? s.join(code, this.settings.name) : s.create(this.settings.name)));
+  }
+
+  async hostDirect() {
+    const scr = this.onlineScr;
+    scr && scr.setStatus('Setting up your room…');
+    const host = new P2PHost();
+    this.pending = host;
+    try {
+      await host.open();
+    } catch (e) {
+      host.close();
+      if (this.pending === host && scr) scr.setStatus(e.message, true);
+      return;
+    }
+    if (this.pending !== host) return host.close();
+    this.pending = null;
+    const s = new OnlineSession(host.localTransport(), { via: 'host', minDelay: 0.035, peer: host });
+    this.session = s;
+    this.wireSession(s);
+    s.on('open', () => s.create(this.settings.name));
+    host.waitForGuest().catch((e) => {
+      if (this.session === s && this.lobbyScr) this.lobbyScr.setStatus(e.message, true);
+    });
+  }
+
+  async joinDirect(code) {
+    const scr = this.onlineScr;
+    scr && scr.setStatus(`Connecting to room ${code}…`);
+    const token = { close() {} };
+    this.pending = token;
+    let transport;
+    try {
+      transport = await connectToHost(code);
+    } catch (e) {
+      if (this.pending === token && scr) scr.setStatus(e.message, true);
+      return;
+    }
+    if (this.pending !== token) return transport.close();
+    this.pending = null;
+    const s = new OnlineSession(transport, { via: 'guest' });
+    this.session = s;
+    this.wireSession(s);
+    s.on('open', () => s.join(code, this.settings.name));
+  }
+
+  wireSession(s) {
+    const scr = this.onlineScr;
     s.on('error', (msg) => scr && scr.setStatus(msg || 'Connection failed.', true));
     s.on('err', (m) => {
       if (this.mode === 'menu' && this.screen === scr) scr.setStatus(m.msg, true);
@@ -204,29 +266,43 @@ class App {
       }
     });
     s.on('room', (m) => this.showLobby(s, m));
-    s.on('lobby', (m) => this.lobbyScr && this.lobbyScr.setLobby(m.lobby));
+    s.on('lobby', (m) => {
+      this.lobbyLast = m.lobby;
+      if (this.lobbyScr) this.lobbyScr.setLobby(m.lobby);
+    });
     s.on('start', (m) => this.startOnline(s, m));
     s.on('ping', (rtt) => (this.ping = rtt));
     s.on('left', () => {
       if (this.mode === 'game') this.hud.callout('OPPONENT LEFT', 'CPU TAKES OVER', 'red', 3);
-      else if (this.lobbyScr) this.lobbyScr.setLobby({ ...(this.lobbyLast || {}), players: [{ name: this.settings.name, ready: false }] });
     });
     s.on('close', () => {
       // a failed connect already showed its own error message
       if (this.session !== s || !s.opened) return;
-      if (this.mode === 'game') this.hud.callout('DISCONNECTED', 'CONNECTION TO SERVER LOST', 'red', 4);
-      else {
+      const what = s.via === 'guest' ? 'host' : 'server';
+      if (this.mode === 'game') {
+        this.hud.callout('DISCONNECTED', `CONNECTION TO ${what.toUpperCase()} LOST`, 'red', 4);
+        if (s.via === 'guest') {
+          // the host was running the game: nothing left to play
+          setTimeout(() => {
+            if (this.session !== s) return;
+            this.showOnline();
+            this.onlineScr.setStatus('The host left or the connection dropped.', true);
+          }, 3500);
+        }
+      } else {
         this.showOnline();
-        this.onlineScr.setStatus('Disconnected from the server.', true);
+        this.onlineScr.setStatus(s.via === 'guest' ? 'Lost the connection to the host.' : 'Disconnected from the server.', true);
       }
     });
   }
 
   showLobby(s, m) {
-    const link = `${location.origin}${location.pathname}?join=${m.code}${new URLSearchParams(location.search).get('server') ? `&server=${encodeURIComponent(this.settings.server)}` : ''}`;
+    const server = s.via === 'server' ? `&server=${encodeURIComponent(this.settings.server)}` : '';
+    const link = `${location.origin}${location.pathname}?join=${m.code}${server}`;
     this.lobbyScr = lobbyScreen({
       code: m.code,
       isHost: m.slot === 0,
+      direct: s.via !== 'server',
       link,
       onLobby: (st) => s.lobby(st),
       onReady: (r) => s.ready(r),
@@ -276,6 +352,10 @@ class App {
   }
 
   endSession() {
+    if (this.pending) {
+      this.pending.close();
+      this.pending = null;
+    }
     if (this.session) {
       this.session.close();
       this.session = null;
@@ -513,7 +593,7 @@ class App {
           this.hud.onEvents(events, view);
           this.sounds(events, view);
           if (!this.paused) this.syncOverlays(view);
-          this.hud.update(view, dt, { labels: I.labels(), passing: this.settings.passing, ping: this.session && this.session.kind === 'online' ? this.ping : undefined });
+          this.hud.update(view, dt, { labels: I.labels(), passing: this.settings.passing, ping: this.session && this.session.kind === 'online' && this.session.via !== 'host' ? this.ping : undefined });
         }
         const icons = this.settings.passing === 'aim' ? null : { labels: I.labels().icons, round: I.lastDevice === 'gamepad' };
         this.renderer.render(view, this.paused && this.session && this.session.kind === 'local' ? 0 : dt, { mode: 'game', skipDraw, icons });
