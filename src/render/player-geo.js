@@ -20,6 +20,9 @@ export const BODY = {
 };
 
 export const MAT = { uniform: 0, skin: 1, helmet: 2, gear: 3, visor: 4 };
+// the helmet's size against the pads: a size up on the head, the pad yoke a touch narrower
+const HEAD_SCALE = 1.16;
+const PAD_NARROW = 0.93;
 const MAT_ORDER = ['uniform', 'skin', 'helmet', 'gear', 'visor'];
 
 export const BONES = [
@@ -305,7 +308,7 @@ export function buildPlayerGeometry(B, team) {
     const lats = 0.05 * window1(y, 1.45, 1.66, 0.08);
     return {
       c: [0, Y(y), 0],
-      rx: rx * lerp(1 + (B.w - 1) * 0.4, B.w, upper) * lerp(1, B.pad, pads) * (1 + belly * 0.35),
+      rx: rx * lerp(1 + (B.w - 1) * 0.4, B.w, upper) * lerp(1, B.pad * PAD_NARROW, pads) * (1 + belly * 0.35),
       rz: rz * lerp(1 + (B.d - 1) * 0.4, B.d, upper),
       n,
       mod: (a) => 1 + (belly + pecs) * Math.max(0, Math.sin(a)) ** 2 + lats * Math.max(0, Math.cos(a)) ** 4 + lats * Math.max(0, -Math.cos(a)) ** 4,
@@ -349,6 +352,7 @@ export function buildPlayerGeometry(B, team) {
   const H = [0, J.head[1] + 0.14 * h, 0];
   const at = (x, y, z) => [H[0] + x, H[1] + y, H[2] + z];
   const head = one('head');
+  const headFrom = Object.fromEntries(MAT_ORDER.map((k) => [k, pieces[k].P.length]));
   buildFace(skin, at, head);
   buildHelmet(pieces, at, head);
   buildFacemask(gear, at, head, hex(C.mask), B.cage);
@@ -357,6 +361,15 @@ export function buildPlayerGeometry(B, team) {
     g.applyMatrix4(new THREE.Matrix4().makeTranslation(...at(0, -0.008, 0)));
     addGeometry(pieces.visor, g, { weight: head });
     g.dispose();
+  }
+  // The whole head a size up (HEAD_SCALE), grown from the bottom of the helmet so it stands up
+  // out of the pads instead of sinking into them: a small helmet on the big pads read as a pinhead.
+  const base = at(0, -0.13, 0);
+  for (const k of MAT_ORDER) {
+    const P = pieces[k].P;
+    for (let i = headFrom[k]; i < P.length; i += 3) {
+      for (let c = 0; c < 3; c++) P[i + c] = base[c] + (P[i + c] - base[c]) * HEAD_SCALE;
+    }
   }
 
   // ---- arms
