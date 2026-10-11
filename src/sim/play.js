@@ -30,6 +30,9 @@ export class Play {
     this.off = spec.off;
     this.def = 1 - spec.off;
     this.dir = dirOf(spec.off);
+    // the way the screen faces: behind the offense, then behind whoever has the ball after a
+    // turnover or on a return (the camera follows it and the controls are screen-relative)
+    this.viewDir = this.dir;
     this.ballOn = spec.ballOn;
     this.losZ = this.dir * (spec.ballOn - 50);
     this.fdZ = spec.fdOn != null && spec.fdOn < 100 && this.kind === 'scrimmage' ? this.dir * (spec.fdOn - 50) : null;
@@ -441,8 +444,8 @@ export class Play {
       const p = this.ctrl[d];
       if (p) {
         const inp = inputs[d];
-        const wx = -this.dir * inp.mx;
-        const wz = this.dir * inp.my;
+        const wx = -this.viewDir * inp.mx;
+        const wz = this.viewDir * inp.my;
         const m = Math.min(1, len(wx, wz));
         if (m > 0.15) {
           if (p.state === 'stance') p.setState('stand');
@@ -682,6 +685,8 @@ export class Play {
   // ------------------------------------------------------------- live
   stepLive(dt, inputs) {
     this.liveT += dt;
+    const b = this.ball;
+    if (b.state === 'held' && b.carrier) this.viewDir = dirOf(b.carrier.team);
     this.updateControl(inputs);
     this.updateScripts(dt);
     if (this.t >= this.nextBlockAssign) {
@@ -716,8 +721,8 @@ export class Play {
       if (!p) continue;
       const inp = inputs[team];
       if (this.liveT < p.lockUntil) continue;
-      const wx = -this.dir * inp.mx;
-      const wz = this.dir * inp.my;
+      const wx = -this.viewDir * inp.mx;
+      const wz = this.viewDir * inp.my;
       const l = len(wx, wz);
       const mag = Math.min(1, l);
       const b = this.ball;
@@ -826,8 +831,8 @@ export class Play {
       this.target[team] = null;
       return;
     }
-    const sx = -this.dir * inp.mx;
-    const sz = this.dir * inp.my;
+    const sx = -this.viewDir * inp.mx;
+    const sz = this.viewDir * inp.my;
     const sl = len(sx, sz);
     const cur = this.target[team];
     let aimX;
@@ -2256,8 +2261,8 @@ export class Play {
       const p = this.ctrl[team];
       if (!p || !p.upright) continue;
       const inp = inputs[team];
-      const wx = -this.dir * inp.mx;
-      const wz = this.dir * inp.my;
+      const wx = -this.viewDir * inp.mx;
+      const wz = this.viewDir * inp.my;
       const l = len(wx, wz);
       if (l > 0.15) {
         p.ix = (wx / l) * Math.min(1, l);

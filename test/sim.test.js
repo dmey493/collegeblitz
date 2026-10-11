@@ -252,3 +252,29 @@ test('CPU games are full of leaping catches and flying tackles', () => {
   assert.ok((count.jump || 0) >= 5, `leaps: ${count.jump}`);
   assert.ok((count.dive || 0) >= 10, `dives: ${count.dive}`);
 });
+
+test('after a turnover the screen and the stick both face the new ball carrier', () => {
+  const m = new Match({ teams: ['IND', 'MICH'], humans: [false, true], seed: 6 });
+  m.poss = 0;
+  m.ballOn = 30;
+  m.startPlay({ kind: 'scrimmage', off: 0, ballOn: 30, fdOn: 60, offPlayId: 'blast', defPlayId: 'safe' });
+  const play = m.play;
+  for (let i = 0; i < 60 * 6 && play.phase !== 'live'; i++) m.step(1 / 60);
+  assert.equal(play.viewDir, 1);
+  // team 1 (the human, on defense) picks it off
+  const lb = play.players.find((q) => q.team === 1 && q.slot === 'LB1');
+  play.ball.state = 'air';
+  play.ball.carrier = null;
+  play.ball.f = { kind: 'pass', resolved: false };
+  play.intercept(lb);
+  play.ctrl[1] = lb;
+  const z0 = lb.z;
+  const inp = { mx: 0, my: 1, turbo: false, a: 0, j: 0, s: 0, c0: 0, c1: 0, c2: 0 };
+  for (let i = 0; i < 40 && play.phase === 'live'; i++) {
+    m.setInput(1, inp);
+    m.step(1 / 60);
+  }
+  assert.equal(play.viewDir, -1, 'the view swings behind the interceptor');
+  assert.ok(lb.z < z0 - 0.5, `pushing up runs him toward his own goal line direction (${lb.z} vs ${z0})`);
+  assert.equal(m.snapshot().pl.vd, -1);
+});

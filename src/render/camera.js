@@ -39,11 +39,9 @@ export class CameraDirector {
       kp = 1.2;
     } else {
       const pl = s.pl;
-      let dir = pl ? pl.dir : s.pos === 0 ? 1 : -1;
-      // after a turnover or on a return, swing around behind whoever has the ball
-      if (pl && pl.ph === 'live' && view.ball && view.ball.state === 'held' && pl.ps !== undefined) this.liveDir = pl.ps === 0 ? 1 : -1;
-      if (pl && (pl.ph === 'live' || pl.ph === 'dead') && this.liveDir) dir = this.liveDir;
-      if (!pl || pl.ph !== 'live' && pl.ph !== 'dead') this.liveDir = 0;
+      // the sim's view direction: behind the offense, swinging around behind whoever has the
+      // ball after a turnover or on a return (the controls follow the same direction)
+      const dir = pl ? pl.vd || pl.dir : s.pos === 0 ? 1 : -1;
       const losZ = pl ? pl.los : dir * (s.on - 50);
       const b = view.ball;
       if (!pl || pl.ph === 'lineup' || pl.ph === 'presnap' || s.ph !== 'play') {
@@ -114,6 +112,14 @@ export class CameraDirector {
           kl = 7;
         }
       }
+    }
+    // the view flipped (turnover, return): cut to the reverse angle instead of swooping
+    const vd = s && s.pl ? s.pl.vd || s.pl.dir : 0;
+    const cut = !this.override && vd && this.lastVd && vd !== this.lastVd && s.pl.ph === 'live';
+    this.lastVd = vd;
+    if (cut && pos && look) {
+      this.pos.copy(pos);
+      this.look.copy(look);
     }
     if (this.override) {
       // fixed camera for close-ups and screenshots: { pos: [x, y, z], look: [x, y, z] }

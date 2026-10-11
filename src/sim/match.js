@@ -593,6 +593,7 @@ export class Match {
         ph: p.phase,
         t: round2(p.liveT),
         dir: p.dir,
+        vd: p.viewDir,
         los: round2(p.losZ),
         fd: p.fdZ === null ? null : round2(p.fdZ),
         off: p.off,
