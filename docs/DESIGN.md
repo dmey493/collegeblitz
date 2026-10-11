@@ -78,8 +78,13 @@ steering, the human QB takes his drop automatically.
 * Animation runs on stride length (long, powerful strides at speed, heel kick, pumping arms),
   blends in backpedals and side shuffles from the body-relative velocity, leans into cuts, and
   has dedicated leap, layout, flying-tackle, big-hit tumble, fall and get-up motions.
+* Regular tackles are wrap-ups: the tackler latches on and both go down together the way he was
+  driving, him on top. Blockers and rushers lock up with their hands on each other.
 * The camera rides a pass out, moves in tight on the catch and stays tight on the runner; after
-  a turnover or on a return it swings around behind the new ball carrier.
+  a turnover or on a return it cuts around behind the new ball carrier, and the controls turn
+  with it (the play owns one view direction that both use), so up is always up the screen.
+* Leaps and dives whoosh, a flying tackle that connects gets a beat of hit-stop and a turf spray,
+  and catches made in the air or laid out get a crowd reaction, a call and a callout.
 
 ## 4. Art direction ("GameCube night game")
 
