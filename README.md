@@ -139,7 +139,8 @@ Online games use the defaults.
 src/sim/            game engine (pure JS, runs in the browser and on the server)
 src/render/         Three.js: field, stadium, skinned procedural players, effects, camera
 src/ui/             menus, HUD, play select (route diagrams drawn from the playbook)
-src/audio/          procedural Web Audio + the announcer (recorded calls in src/audio/voice)
+src/audio/          Web Audio: procedural effects, the announcer (src/audio/voice), the robot
+                    down call (src/audio/downs) and recorded hits, grunts and crowd (src/audio/sfx)
 src/net/            sessions: local (vs CPU), online client, shared game rooms,
                     WebRTC peer-to-peer, matchmaking API
 netlify/functions/  matchmaking function for Netlify (Blobs-backed)
@@ -147,8 +148,17 @@ server/             optional Node server: static files, matchmaking, WebSocket r
 test/               headless engine, controls and networking tests (npm test)
 ```
 
-Every texture (uniforms, helmets, field paint, crowd, state outlines), every player model and
-every sound effect is generated at runtime, so there are no art or sound-effect assets to license.
+Every texture (uniforms, helmets, field paint, crowd, state outlines) and every player model is
+generated at runtime, so there are no art assets to license. Most sound effects are procedural
+too; the recorded ones (pad hits, grunts, the line's clash at the snap, crowd roars and oohs, in
+`src/audio/sfx`) are ElevenLabs sound effects, mixed quietly under the play. `tools/voice/sfx.sh
+<downloaded.mp3> <name> <max seconds>` trims and levels a new one.
+
+Before every scrimmage play a deep robot voice reads the down and distance at the line, like the
+arcade original: "FIRST AND THIRTY", "THIRD AND TWELVE", "FOURTH AND GOAL". It is an ElevenLabs
+voice ("Gaming – Unreal Tonemanagement 2003") put through `tools/voice/robot.sh` (pitched down,
+tightened, a short metallic echo and hard compression), and each call is spliced from pieces in
+`src/audio/downs`: the down ("Third and"), then the distance ("twelve", "twenty" + "nine", "goal").
 
 The announcer is an ElevenLabs voice, "World Wrestling Announcer", with lines written in the spirit
 of the arcade original's sarcastic play-by-play: short calls ("Sacked!") mixed with irreverent

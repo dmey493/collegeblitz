@@ -438,25 +438,37 @@ class App {
   sounds(events, view) {
     const A = this.audio;
     const say = (k) => A.announce(k);
+    // the recorded pads and grunts, under the procedural crack
+    const pads = (gain, grunt = 0.7) => {
+      A.sample('hit', { gain });
+      if (grunt) A.sample('grunt', { gain: grunt, delay: 0.04 });
+    };
     for (const e of events) {
       switch (e.k) {
         case 'snap':
-          if (e.kind === 'scrimmage' || e.kind === 'two') A.hike();
+          if (e.kind === 'scrimmage' || e.kind === 'two') {
+            A.hike();
+            // the lines meet a beat after the snap
+            A.sample('clash', { gain: 0.55, delay: 0.32 });
+          }
           break;
         case 'whistle':
           if (e.type !== 'td') A.whistle();
           break;
         case 'tackle':
           A.hit(!!e.big);
+          pads(e.big ? 0.95 : 0.65, e.big ? 0.85 : 0.6);
           if (e.sack) say('sack');
           else if (e.big && Math.random() < 0.6) say('big');
           break;
         case 'lateHit':
           A.hit(true);
+          pads(0.9);
           say('late');
           break;
         case 'interference':
           A.hit(false);
+          pads(0.7);
           A.ooh();
           if (Math.random() < 0.6) say('noflag');
           break;
@@ -467,14 +479,19 @@ class App {
           A.catchBall();
           if (e.air || e.layout) {
             A.cheer(0.55, 1.6);
+            A.sample('roar', { gain: 0.6 });
             if (Math.random() < 0.55) say(e.layout ? 'layout' : 'grab');
           }
           break;
         case 'dive':
           A.whoosh(0.7);
+          if (Math.random() < 0.5) A.sample('grunt', { gain: 0.45 });
           break;
         case 'land':
-          if (e.pile) A.hit(false);
+          if (e.pile) {
+            A.hit(false);
+            pads(0.55, 0.5);
+          }
           break;
         case 'pile':
           if (e.first) {
@@ -491,14 +508,17 @@ class App {
           break;
         case 'td':
           A.touchdown();
+          A.sample('roar', { gain: 1 });
           say('td');
           break;
         case 'int':
           A.turnover();
+          A.sample('roar', { gain: 0.8 });
           say('int');
           break;
         case 'fumble':
           A.turnover();
+          A.sample('roar', { gain: 0.7 });
           say('fumble');
           break;
         case 'firstDown':
@@ -511,6 +531,7 @@ class App {
           break;
         case 'fgGood':
           A.cheer(0.9, 3);
+          A.sample('roar', { gain: 0.8 });
           say('fg');
           break;
         case 'fgMiss':
@@ -523,9 +544,11 @@ class App {
           break;
         case 'broken':
           A.hit(false);
+          pads(0.5, 0.6);
           break;
         case 'stiffArmed':
           A.hit(false);
+          pads(0.55, 0.7);
           if (Math.random() < 0.45) say('stiff');
           break;
         case 'deflect':
@@ -538,9 +561,13 @@ class App {
           A.turnover();
           say('safety');
           break;
-        case 'set':
-          A.crowd(0.1 + (view && view.snap && view.snap.dn >= 3 ? 0.08 : 0), 0.8);
+        case 'set': {
+          const s = view && view.snap;
+          A.crowd(0.1 + (s && s.dn >= 3 ? 0.08 : 0), 0.8);
+          // the robot reads the down and distance as the teams line up
+          if (s && !s.conv && e.kind !== 'kickoff' && e.kind !== 'two') A.downCall(s.dn, s.tg, s.fd >= 100);
           break;
+        }
         default:
           break;
       }

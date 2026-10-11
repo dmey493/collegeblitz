@@ -1,10 +1,51 @@
-// Procedural audio — no sound files, apart from the announcer's recorded calls (announcer.js).
+// Mostly procedural audio. The recorded sounds are the announcer's calls (announcer.js), the
+// robot down-and-distance call (downcall.js) and, kept quiet under the mix, pad hits, grunts, the
+// line's clash at the snap and crowd roars and oohs (./sfx, made with ElevenLabs sound effects).
 // AUDIO IDENTITY: packed night stadium. Timbre: mechanical impacts (pad cracks = noise + thump)
 // with brassy saw stabs. Key: E minor pentatonic (E G A B D).
 // Success = rising E-G-B-E; failure = the same notes falling into a thud.
 // Signature: the big-hit CRACK followed by the crowd's "OOOH".
 
 import { pickLine, TAKES } from './announcer.js';
+import { downCallParts } from './downcall.js';
+
+// the build inlines each clip as a data: URL
+const SFX_FILES = import.meta.glob('./sfx/*.mp3', { eager: true, query: '?url', import: 'default' });
+const DOWN_FILES = import.meta.glob('./downs/*.mp3', { eager: true, query: '?url', import: 'default' });
+// "hit" -> [url, ...] (hit-0.mp3, hit-1.mp3, ...)
+const SAMPLES = {};
+for (const [path, url] of Object.entries(SFX_FILES)) {
+  const m = /\/([a-z]+)-\d+\.mp3$/.exec(path);
+  if (m) (SAMPLES[m[1]] ||= []).push(url);
+}
+// "down-3" -> url
+const DOWN_CLIPS = {};
+for (const [path, url] of Object.entries(DOWN_FILES)) {
+  const m = /\/([a-z0-9-]+)\.mp3$/.exec(path);
+  if (m) DOWN_CLIPS[m[1]] = url;
+}
+
+// where the speech in a clip stops (the echo tail runs on under the next piece)
+const speechEnds = new WeakMap();
+function speechEnd(buf) {
+  let end = speechEnds.get(buf);
+  if (end == null) {
+    const d = buf.getChannelData(0);
+    const w = Math.round(buf.sampleRate * 0.01);
+    const rms = [];
+    for (let i = 0; i + w <= d.length; i += w) {
+      let sum = 0;
+      for (let j = i; j < i + w; j++) sum += d[j] * d[j];
+      rms.push(Math.sqrt(sum / w));
+    }
+    const floor = Math.max(...rms) * 0.1; // 20 dB under the loudest moment
+    let last = rms.length - 1;
+    while (last > 0 && rms[last] < floor) last--;
+    end = Math.min(buf.duration, (last + 1) * 0.01 + 0.03);
+    speechEnds.set(buf, end);
+  }
+  return end;
+}
 
 // calls that may cut off whatever the announcer is in the middle of
 const URGENT_CALLS = new Set(['td', 'int', 'fumble', 'safety', 'fg', 'nofg']);
@@ -19,10 +60,12 @@ export class AudioEngine {
     this.crowdLevel = 0.1;
     this.lastHit = 0;
     this.voices = null;
-    this.voiceBufs = new Map();
+    this.clipBufs = new Map();
     this.voiceSeq = 0;
-    this.voiceSrc = null;
+    this.voiceSrcs = [];
     this.voiceUntil = 0;
+    this.lastTake = {};
+    this.lastSample = {};
   }
 
   unlock() {
@@ -49,8 +92,13 @@ export class AudioEngine {
     this.voiceBus = ctx.createGain();
     this.voiceBus.gain.value = 1.15;
     this.voiceBus.connect(this.master);
-    // decode the announcer's recorded calls up front so they fire on the frame of the play
-    for (const takes of Object.values(TAKES)) for (const url of takes) this.voiceBuffer(url).catch(() => {});
+    // the recorded hits, grunts and crowd sit well under the announcer: there, not loud
+    this.fxBus = ctx.createGain();
+    this.fxBus.gain.value = 0.5;
+    this.fxBus.connect(this.master);
+    // decode every recorded clip up front so they fire on the frame of the play
+    const urls = [...Object.values(TAKES).flat(), ...Object.values(SAMPLES).flat(), ...Object.values(DOWN_CLIPS)];
+    for (const url of urls) this.clipBuffer(url).catch(() => {});
     // noise buffers
     const len = ctx.sampleRate * 2;
     this.noise = ctx.createBuffer(1, len, ctx.sampleRate);
@@ -173,8 +221,36 @@ export class AudioEngine {
 
   ooh() {
     if (!this.ctx) return;
+    if (SAMPLES.ooh) {
+      this.sample('ooh', { gain: 0.8, delay: 0.08, spread: 0.03 });
+      return;
+    }
     const t = this.t + 0.05;
     for (const [f0, f1] of [[520, 300], [780, 420]]) this.burst({ t, a: 0.12, d: 0.9, peak: 0.16, freq: f0, sweepTo: f1, q: 3, buf: this.noise });
+  }
+
+  // a recorded sound effect ('hit', 'grunt', 'clash', 'roar', 'ooh'): a random take, never the
+  // same one twice running, at a slightly different pitch each time
+  sample(name, { gain = 1, delay = 0, spread = 0.06 } = {}) {
+    if (!this.ctx || !this.settings.sound) return;
+    const urls = SAMPLES[name];
+    if (!urls) return;
+    const at = this.t + delay;
+    // a pile of bodies is one crunch, not ten
+    if (at - (this.lastSample[name] ?? -1) < 0.09) return;
+    this.lastSample[name] = at;
+    let i = Math.floor(Math.random() * urls.length);
+    if (urls.length > 1 && i === this.lastTake[name]) i = (i + 1) % urls.length;
+    this.lastTake[name] = i;
+    this.clipBuffer(urls[i]).then((buf) => {
+      const src = this.ctx.createBufferSource();
+      src.buffer = buf;
+      src.playbackRate.value = 1 + (Math.random() * 2 - 1) * spread;
+      const g = this.ctx.createGain();
+      g.gain.value = gain;
+      src.connect(g).connect(this.fxBus);
+      src.start(Math.max(at, this.t));
+    }, () => {});
   }
 
   // ---------------------------------------------------------------- sfx
@@ -357,8 +433,43 @@ export class AudioEngine {
     else this.say(line.text);
   }
 
-  voiceBuffer(url) {
-    let p = this.voiceBufs.get(url);
+  // The robot at the line: "THIRD AND TWELVE", "FIRST AND GOAL". It takes over from the announcer,
+  // and his quips wait until it's done.
+  downCall(dn, tg, goal) {
+    if (!this.ctx || !this.settings.announcer || !this.settings.sound) return;
+    const urls = downCallParts(dn, tg, goal).map((n) => DOWN_CLIPS[n]);
+    if (!urls.length || !urls.every(Boolean)) return;
+    const id = ++this.voiceSeq;
+    Promise.all(urls.map((u) => this.clipBuffer(u))).then((bufs) => {
+      if (id !== this.voiceSeq) return;
+      this.stopVoice();
+      let at = this.t + 0.03;
+      for (const buf of bufs) {
+        const src = this.ctx.createBufferSource();
+        src.buffer = buf;
+        src.connect(this.voiceBus);
+        src.start(at);
+        this.voiceSrcs.push(src);
+        at += speechEnd(buf);
+      }
+      this.voiceUntil = at + 0.2;
+    }, () => {});
+  }
+
+  stopVoice() {
+    for (const src of this.voiceSrcs) {
+      try {
+        src.stop();
+      } catch {
+        /* already finished */
+      }
+    }
+    this.voiceSrcs = [];
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+  }
+
+  clipBuffer(url) {
+    let p = this.clipBufs.get(url);
     if (!p) {
       p = (async () => {
         let bytes;
@@ -370,7 +481,7 @@ export class AudioEngine {
         } else bytes = new Uint8Array(await (await fetch(url)).arrayBuffer());
         return this.ctx.decodeAudioData(bytes.buffer);
       })();
-      this.voiceBufs.set(url, p);
+      this.clipBufs.set(url, p);
     }
     return p;
   }
@@ -378,22 +489,15 @@ export class AudioEngine {
   playVoice(url, text) {
     if (!this.settings.announcer || !this.settings.sound) return;
     const id = ++this.voiceSeq;
-    this.voiceBuffer(url).then((buf) => {
+    this.clipBuffer(url).then((buf) => {
       if (id !== this.voiceSeq) return; // a newer call came in while this one decoded
       // one announcer: a new call cuts off the last one
-      if (this.voiceSrc) {
-        try {
-          this.voiceSrc.stop();
-        } catch {
-          /* already finished */
-        }
-      }
-      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      this.stopVoice();
       const src = this.ctx.createBufferSource();
       src.buffer = buf;
       src.connect(this.voiceBus);
       src.start();
-      this.voiceSrc = src;
+      this.voiceSrcs.push(src);
       this.voiceUntil = this.t + buf.duration;
     }, () => this.say(text));
   }
@@ -404,15 +508,9 @@ export class AudioEngine {
     try {
       const synth = window.speechSynthesis;
       if (interrupt) {
-        synth.cancel();
         this.voiceSeq++;
-        if (this.voiceSrc) {
-          try {
-            this.voiceSrc.stop();
-          } catch {
-            /* already finished */
-          }
-        }
+        if (this.ctx) this.stopVoice();
+        else synth.cancel();
       }
       const u = new SpeechSynthesisUtterance(text);
       u.rate = rate;

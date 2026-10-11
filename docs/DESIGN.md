@@ -152,6 +152,12 @@ steering, the human QB takes his drop automatically.
 * **Success motif:** rising E–G–B–E brass stab (first downs: short version; touchdowns: full fanfare).
 * **Failure motif:** the same notes descending B–G–E into a low thud (turnovers).
 * **Signature sound:** the big-hit "CRACK" followed by a crowd "OOOH".
+* **Bodies:** recorded pad hits and grunts on every tackle, stiff-arm and pile-on, the two lines
+  clashing a beat after the snap, and recorded crowd roars and oohs over the procedural crowd bed
+  (`src/audio/sfx`, ElevenLabs sound effects). They sit well under the announcer: there, not loud.
+* **The robot at the line:** before every scrimmage play a deep, processed voice reads the down and
+  distance ("THIRD AND TWELVE", "FIRST AND GOAL"), spliced from recorded pieces like the arcade
+  original (`src/audio/downs`, `src/audio/downcall.js`).
 * **Music:** menus get a driving 140 BPM synth-rock loop; in-game is crowd ambience only.
 * Announcer for the big calls (toggle in settings): recorded takes from an ElevenLabs pro-wrestling
   announcer voice (`src/audio/voice`), with the browser's text-to-speech for any line not yet recorded.
@@ -163,7 +169,8 @@ src/sim/      Pure JavaScript game engine (no DOM, no Three.js). Rules, physics,
               AI, match flow. Runs in the browser (vs CPU) AND on the server (online).
 src/render/   Three.js renderer that draws whatever snapshot it is given.
 src/ui/       DOM screens + HUD.
-src/audio/    Procedural Web Audio (no audio files).
+src/audio/    Web Audio: procedural effects and stingers, plus recorded announcer calls,
+              down-and-distance pieces and quiet hit/grunt/crowd samples.
 src/net/      Sessions with one interface: local (vs CPU) and online. Shared game rooms
               (room.js), WebRTC peer-to-peer (p2p.js), matchmaking API (signal-api.js).
 netlify/      Matchmaking function for Netlify, rooms kept in Netlify Blobs.
