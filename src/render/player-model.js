@@ -666,6 +666,13 @@ export class PlayerModel {
         T.armFwd[0] = 0.55;
         T.elbow[0] = 1.95;
         T.armAbd[0] = 0.2;
+        if (s === 'jump') {
+          // caught at the top: the other hand comes down over the ball to secure it for the landing
+          T.armFwd[1] = 0.8;
+          T.elbow[1] = 1.8;
+          T.armAbd[1] = 0.05;
+          T.armTwist[1] = 0;
+        }
       }
     }
     if (v.reach && s !== 'jump' && s !== 'dive' && !v.ball) {
