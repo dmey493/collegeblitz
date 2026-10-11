@@ -92,6 +92,10 @@ export class AudioEngine {
     this.voiceBus = ctx.createGain();
     this.voiceBus.gain.value = 1.15;
     this.voiceBus.connect(this.master);
+    // the robot at the line sits under the announcer
+    this.downBus = ctx.createGain();
+    this.downBus.gain.value = 0.7;
+    this.downBus.connect(this.master);
     // the recorded hits, grunts and crowd sit well under the announcer: there, not loud
     this.fxBus = ctx.createGain();
     this.fxBus.gain.value = 0.5;
@@ -443,16 +447,17 @@ export class AudioEngine {
     Promise.all(urls.map((u) => this.clipBuffer(u))).then((bufs) => {
       if (id !== this.voiceSeq) return;
       this.stopVoice();
-      let at = this.t + 0.03;
+      let at = this.t + 0.02;
       for (const buf of bufs) {
         const src = this.ctx.createBufferSource();
         src.buffer = buf;
-        src.connect(this.voiceBus);
+        src.connect(this.downBus);
         src.start(at);
         this.voiceSrcs.push(src);
-        at += speechEnd(buf);
+        // the next piece comes in on the tail of this one: one quick, clipped read
+        at += speechEnd(buf) - 0.05;
       }
-      this.voiceUntil = at + 0.2;
+      this.voiceUntil = at + 0.1;
     }, () => {});
   }
 

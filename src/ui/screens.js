@@ -6,8 +6,8 @@ import { logoDataURL } from '../render/textures.js';
 import { LAYOUTS, PAD_LABELS } from '../input.js';
 
 const KEY_OPTIONS = [
-  { label: 'ARROWS + S D F', value: 'arrows' },
   { label: 'WASD + J K L', value: 'wasd' },
+  { label: 'ARROWS + S D F', value: 'arrows' },
 ];
 const PASS_OPTIONS = [
   { label: 'RECEIVER KEYS', value: 'icons' },
@@ -16,8 +16,38 @@ const PASS_OPTIONS = [
 
 // One-line cheat sheet for a keyboard layout.
 export function keyLine(keys) {
-  const L = (LAYOUTS[keys] || LAYOUTS.arrows).labels;
+  const L = (LAYOUTS[keys] || LAYOUTS.wasd).labels;
   return `MOVE ${L.move} · PASS ${L.pass} · JUMP ${L.jump} · SPIN/DIVE ${L.spin} · TURBO ${L.turbo}`;
+}
+
+// The buttons drawn as keycaps, for the team select: you see them before kickoff, and they
+// follow the CONTROLS and PASSING choices.
+export function controlsCard(keys, passing) {
+  const el = h('div.ctrl-card');
+  const cap = (k, cls = '') => h(`span.kc${cls}`, k);
+  const key = (caps, label) => h('div.ck', h('div.kcs', ...caps), h('div.ckl', label));
+  const paint = (k, pass) => {
+    const lay = LAYOUTS[k] ? k : 'wasd';
+    const L = LAYOUTS[lay].labels;
+    const move = lay === 'arrows' ? ['←', '↑', '↓', '→'] : ['W', 'A', 'S', 'D'];
+    const offense = pass === 'aim'
+      ? `steer at a receiver, ${L.pass} to throw`
+      : `${L.icons.join(' ')} throw to the receiver wearing that key`;
+    el.replaceChildren(
+      h('div.ctrl-head', h('span', 'CONTROLS'), h('span.ctrl-name', LAYOUTS[lay].name)),
+      h('div.ctrl-keys',
+        key(move.map((c) => cap(c)), 'MOVE'),
+        key([cap(L.turbo, '.wide')], 'TURBO (HOLD)'),
+        key([cap(L.pass, '.act')], 'PASS · SWITCH'),
+        key([cap(L.jump, '.act')], 'JUMP · HURDLE'),
+        key([cap(L.spin, '.act')], 'SPIN · DIVE')),
+      h('div.ctrl-sit',
+        h('div', h('b', 'QB '), `${offense} · hold TURBO for a bullet`),
+        h('div', h('b', 'WITH THE BALL '), `${L.pass} stiff-arm · ${L.jump} hurdle · ${L.spin} spin`),
+        h('div', h('b', 'DEFENSE '), `${L.pass} switch · ${L.jump} jump to swat · ${L.spin} flying tackle`)));
+  };
+  paint(keys, passing);
+  return { el, paint };
 }
 
 export function logoBlock(small = false) {
@@ -27,14 +57,14 @@ export function logoBlock(small = false) {
     h('div.logo-tag', '1ST & 30 · NO FLAGS · NO MERCY'));
 }
 
-export function titleScreen({ onPlay, onOnline, onHowTo, onSettings, sfx }) {
+export function titleScreen({ onPlay, onOnline, onHowTo, onSettings, keys = 'wasd', sfx }) {
   const menu = new MenuList([
     { label: 'PLAY VS CPU', onPress: onPlay },
     { label: 'PLAY ONLINE', hint: 'HEAD-TO-HEAD', onPress: onOnline },
     { label: 'HOW TO PLAY', onPress: onHowTo },
     { label: 'SETTINGS', onPress: onSettings },
   ], { onMove: sfx.move, onSelect: sfx.select, className: 'title-menu' });
-  const el = h('div.screen.title', logoBlock(), menu.el, h('div.press', 'ARROWS + ENTER · OR STICK + (A)'), h('div.foot', 'MOCKUP v0.2 · INDIANA vs MICHIGAN'));
+  const el = h('div.screen.title', logoBlock(), menu.el, h('div.press', keys === 'arrows' ? 'ARROWS + ENTER · OR STICK + (A)' : 'W S + J · OR ARROWS + ENTER · OR STICK + (A)'), h('div.foot', 'MOCKUP v0.2 · INDIANA vs MICHIGAN'));
   return { el, handle: (e) => menu.handle(e) };
 }
 
@@ -76,11 +106,11 @@ export function setupScreen({ settings, onStart, onBack, onControls, sfx }) {
     }
   };
   const teamItem = { label: 'YOUR TEAM', kind: 'select', options: ids.map((id) => ({ label: TEAMS[id].name, value: id })), value: state.team, onChange: (v) => { state.team = v; paintCards(); } };
-  const keysHelp = h('div.keyline', keyLine(settings.keys));
+  const ctrl = controlsCard(settings.keys, settings.passing);
   const menu = new MenuList([
     teamItem,
-    { label: 'CONTROLS', kind: 'select', options: KEY_OPTIONS, value: settings.keys, onChange: (v) => { settings.keys = v; keysHelp.textContent = keyLine(v); onControls && onControls(settings); } },
-    { label: 'PASSING', kind: 'select', options: PASS_OPTIONS, value: settings.passing, onChange: (v) => (settings.passing = v) },
+    { label: 'CONTROLS', kind: 'select', options: KEY_OPTIONS, value: settings.keys, onChange: (v) => { settings.keys = v; ctrl.paint(v, settings.passing); onControls && onControls(settings); } },
+    { label: 'PASSING', kind: 'select', options: PASS_OPTIONS, value: settings.passing, onChange: (v) => { settings.passing = v; ctrl.paint(settings.keys, v); } },
     { label: 'QUARTER LENGTH', kind: 'select', options: [60, 90, 120, 180, 300].map((s) => ({ label: `${s / 60} MIN`.replace('1.5', '1:30'), value: s })), value: settings.quarterSec, onChange: (v) => (settings.quarterSec = v) },
     { label: 'FIRST DOWN', kind: 'select', options: [{ label: '30 YARDS', value: 30 }, { label: '25 YARDS', value: 25 }, { label: '10 YARDS (SIM)', value: 10 }], value: settings.fdYards, onChange: (v) => (settings.fdYards = v) },
     { label: 'CPU', kind: 'select', options: [{ label: 'ROOKIE', value: 'rookie' }, { label: 'VARSITY', value: 'varsity' }, { label: 'HEISMAN', value: 'heisman' }], value: settings.difficulty, onChange: (v) => (settings.difficulty = v) },
@@ -94,7 +124,7 @@ export function setupScreen({ settings, onStart, onBack, onControls, sfx }) {
   menu.i = 9;
   menu.paint();
   paintCards();
-  const el = h('div.screen.setup', h('div.screen-title', 'CHOOSE YOUR STATE'), h('div.setup-row', cards, h('div.panel.narrow', menu.el, keysHelp)));
+  const el = h('div.screen.setup', h('div.screen-title', 'CHOOSE YOUR STATE'), h('div.setup-row', h('div.setup-left', cards, ctrl.el), h('div.panel.narrow', menu.el)));
   return { el, handle: (e) => menu.handle(e) };
 }
 
@@ -103,9 +133,9 @@ export function howToScreen({ settings = {}, onBack, sfx }) {
   const A = LAYOUTS.arrows.labels;
   const W = LAYOUTS.wasd.labels;
   const P = PAD_LABELS;
-  const cur = settings.keys === 'wasd' ? 2 : 1;
+  const cur = settings.keys === 'arrows' ? 2 : 1;
   const cell = (i, v) => h(i === cur ? 'td.cur' : 'td', v);
-  const row = (k, a, w, p) => h('tr', h('th', k), cell(1, a), cell(2, w), cell(3, p));
+  const row = (k, w, a, p) => h('tr', h('th', k), cell(1, w), cell(2, a), cell(3, p));
   const icons = settings.passing !== 'aim';
   const el = h('div.screen.howto',
     h('div.screen-title', 'HOW TO PLAY'),
@@ -113,14 +143,14 @@ export function howToScreen({ settings = {}, onBack, sfx }) {
       h('div.panel',
         h('h3', 'CONTROLS'),
         h('table.keys',
-          h('tr', h('th', ''), cell(1, 'ARROWS'), cell(2, 'WASD'), cell(3, 'GAMEPAD')),
-          row('MOVE', A.move, W.move, P.move),
-          row('TURBO (HOLD)', `${A.turbo} / SHIFT`, `${W.turbo} / SHIFT`, 'RT / RB'),
-          row('PASS / SWITCH', A.pass, W.pass, P.pass),
-          row('JUMP / HURDLE', A.jump, W.jump, P.jump),
-          row('SPIN / DIVE', A.spin, W.spin, P.spin),
+          h('tr', h('th', ''), cell(1, 'WASD'), cell(2, 'ARROWS'), cell(3, 'GAMEPAD')),
+          row('MOVE', W.move, A.move, P.move),
+          row('TURBO (HOLD)', `${W.turbo} / SHIFT`, `${A.turbo} / SHIFT`, 'RT / RB'),
+          row('PASS / SWITCH', W.pass, A.pass, P.pass),
+          row('JUMP / HURDLE', W.jump, A.jump, P.jump),
+          row('SPIN / DIVE', W.spin, A.spin, P.spin),
           row('SNAP / KICK', 'ANY', 'ANY', 'ANY'),
-          row('THROW TO', A.icons.join(' '), W.icons.join(' '), P.icons.join(' ')),
+          row('THROW TO', W.icons.join(' '), A.icons.join(' '), P.icons.join(' ')),
           row('PAUSE', 'ESC / P', 'ESC / P', 'START')),
         h('div.note', 'Change the layout under SETTINGS → CONTROLS. One hand steers, the other hand has every button: no two-button combos.')),
       h('div.panel',

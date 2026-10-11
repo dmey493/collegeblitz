@@ -46,7 +46,7 @@ const PAD = { pass: [0], jump: [1], spin: [2], turbo: [7, 5, 6], pause: [9], bac
 export const PAD_LABELS = { move: 'STICK', pass: 'A', jump: 'B', spin: 'X', turbo: 'RT', icons: ['X', 'A', 'B'] };
 
 export class Input {
-  constructor(layout = 'arrows') {
+  constructor(layout = 'wasd') {
     this.down = new Set();
     this.menuQ = [];
     this.a = 0; // pass presses
@@ -63,7 +63,7 @@ export class Input {
   }
 
   setLayout(name) {
-    this.layoutName = LAYOUTS[name] ? name : 'arrows';
+    this.layoutName = LAYOUTS[name] ? name : 'wasd';
     this.L = LAYOUTS[this.layoutName];
     const all = [...Object.values(this.L.move).flat(), ...this.L.pass, ...this.L.jump, ...this.L.spin, ...Object.values(COMMON).flat()];
     this.usedKeys = new Set(all);

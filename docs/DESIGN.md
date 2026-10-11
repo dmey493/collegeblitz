@@ -44,13 +44,13 @@ Screen-relative (up = away from camera; the camera always sits behind the offens
 Keyboard rule: **one hand steers, the other hand has every button, no two-button combos**
 (the old Turbo+Jump spin and dive were impossible with the arrows on the right-hand side).
 
-| Action | Arrows layout (default) | WASD layout | Gamepad |
+| Action | WASD layout (default) | Arrows layout | Gamepad |
 |---|---|---|---|
-| Move | Arrow keys | W A S D | Left stick / D-pad |
+| Move | W A S D | Arrow keys | Left stick / D-pad |
 | Turbo (hold) | Space / Shift (thumb) | Space / Shift | RT / RB |
-| Pass · switch player · stiff-arm | F (index) | J (index) | A |
-| Jump · hurdle | D (middle) | K (middle) | B |
-| Spin · dive | S (ring) | L (ring) | X |
+| Pass · switch player · stiff-arm | J (index) | F (index) | A |
+| Jump · hurdle | K (middle) | D (middle) | B |
+| Spin · dive | L (ring) | S (ring) | X |
 | Snap / kick | any of the three | any of the three | A / B / X |
 | Pause | Esc / P | Esc / P | Start |
 
@@ -155,8 +155,8 @@ steering, the human QB takes his drop automatically.
 * **Bodies:** recorded pad hits and grunts on every tackle, stiff-arm and pile-on, the two lines
   clashing a beat after the snap, and recorded crowd roars and oohs over the procedural crowd bed
   (`src/audio/sfx`, ElevenLabs sound effects). They sit well under the announcer: there, not loud.
-* **The robot at the line:** before every scrimmage play a deep, processed voice reads the down and
-  distance ("THIRD AND TWELVE", "FIRST AND GOAL"), spliced from recorded pieces like the arcade
+* **The robot at the line:** as the huddles break on every scrimmage play, a deep, processed voice
+  (kept under the announcer) reads the down and distance ("THIRD AND TWELVE", "FIRST AND GOAL"), spliced from recorded pieces like the arcade
   original (`src/audio/downs`, `src/audio/downcall.js`).
 * **Music:** menus get a driving 140 BPM synth-rock loop; in-game is crowd ambience only.
 * Announcer for the big calls (toggle in settings): recorded takes from an ElevenLabs pro-wrestling

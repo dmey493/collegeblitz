@@ -30,7 +30,8 @@ export class Room {
     this.players = [null, null];
     this.ready = [false, false];
     this.rematch = [false, false];
-    this.lobby = { team: 'IND', rules: { quarterSec: 120, fdYards: 30 } };
+    // online games play at TURBO speed, like a fresh vs-CPU game
+    this.lobby = { team: 'IND', rules: { quarterSec: 120, fdYards: 30, pace: 1.2 } };
     this.match = null;
     this.stopLoop = null;
     this.created = Date.now();

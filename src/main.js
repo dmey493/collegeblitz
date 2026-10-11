@@ -20,15 +20,23 @@ import { brushedMetalDataURL } from './render/textures.js';
 import { titleScreen, setupScreen, howToScreen, settingsScreen, onlineScreen, lobbyScreen, pauseScreen, finalScreen } from './ui/screens.js';
 
 const STORE = 'collegeblitz.settings.v1';
+// v2: everyone starts on WASD + J K L, TURBO game speed and ARCADE jumps
+const SETTINGS_V = 2;
 function loadSettings() {
   const base = {
     sound: true, music: true, announcer: true, quality: 'high', quarterSec: 120, fdYards: 30, difficulty: 'varsity',
-    hang: 1, dives: 1, pace: 1,
-    team: 'IND', name: 'PLAYER', server: defaultServerUrl(), keys: 'arrows', passing: 'icons', online: 'direct',
+    hang: 1, dives: 1, pace: 1.2,
+    team: 'IND', name: 'PLAYER', server: defaultServerUrl(), keys: 'wasd', passing: 'icons', online: 'direct',
+    v: SETTINGS_V,
   };
   try {
     const s = JSON.parse(localStorage.getItem(STORE) || '{}');
-    return { ...base, ...s, server: s.server || base.server };
+    if (!(s.v >= SETTINGS_V)) {
+      delete s.keys;
+      delete s.pace;
+      delete s.hang;
+    }
+    return { ...base, ...s, v: SETTINGS_V, server: s.server || base.server };
   } catch {
     return base;
   }
@@ -108,6 +116,7 @@ class App {
       onOnline: () => this.showOnline(),
       onHowTo: () => this.showHowTo(() => this.showTitle()),
       onSettings: () => this.showSettings(),
+      keys: this.settings.keys,
       sfx: this.sfx,
     }));
   }
@@ -561,13 +570,15 @@ class App {
           A.turnover();
           say('safety');
           break;
-        case 'set': {
+        case 'calls': {
+          // both plays are in: the robot reads the down and distance as the huddles break
           const s = view && view.snap;
-          A.crowd(0.1 + (s && s.dn >= 3 ? 0.08 : 0), 0.8);
-          // the robot reads the down and distance as the teams line up
-          if (s && !s.conv && e.kind !== 'kickoff' && e.kind !== 'two') A.downCall(s.dn, s.tg, s.fd >= 100);
+          if (s && !s.conv) A.downCall(s.dn, s.tg, s.fd >= 100);
           break;
         }
+        case 'set':
+          A.crowd(0.1 + (view && view.snap && view.snap.dn >= 3 ? 0.08 : 0), 0.8);
+          break;
         default:
           break;
       }

@@ -83,18 +83,19 @@ While developing, run `npm start` and `npm run dev` together: Vite proxies `/api
 
 ## Controls
 
-One hand steers and the other hand has every button. There are no two-button combos. Pick the
-layout under **SETTINGS → CONTROLS** (or on the vs-CPU setup screen).
+One hand steers and the other hand has every button. There are no two-button combos. The game
+starts on **WASD + J K L**; switch to the arrows under **SETTINGS → CONTROLS** or on the vs-CPU
+team select, which also shows the current buttons as keycaps so you know them before kickoff.
 
-| | Arrows layout (default) | WASD layout | Gamepad |
+| | WASD layout (default) | Arrows layout | Gamepad |
 |---|---|---|---|
-| Move | Arrow keys | W A S D | Left stick / D-pad |
+| Move | W A S D | Arrow keys | Left stick / D-pad |
 | Turbo (hold) | Space or Shift | Space or Shift | RT / RB |
-| Pass · Switch player · Stiff-arm | F | J | A |
-| Jump · Hurdle | D | K | B |
-| Spin · Dive | S | L | X |
+| Pass · Switch player · Stiff-arm | J | F | A |
+| Jump · Hurdle | K | D | B |
+| Spin · Dive | L | S | X |
 | Snap / kick | any of the three | any of the three | A / B / X |
-| Throw to a receiver | S / D / F | J / K / L | X / A / B |
+| Throw to a receiver | J / K / L | S / D / F | X / A / B |
 | Pause / menu | Esc or P | Esc or P | Start |
 
 - **QB (receiver keys, the default):** every receiver wears a key icon, laid out left to right like
@@ -115,14 +116,15 @@ layout under **SETTINGS → CONTROLS** (or on the vs-CPU setup screen).
 
 ## Arcade feel (vs CPU)
 
-The setup screen has three dials for tuning how the game feels while you play:
+The setup screen has three dials for tuning how the game feels while you play. A new game starts
+on ARCADE jumps, NORMAL dives and TURBO speed:
 
 - **JUMPS**: how long leaps and flying tackles hang in the air (SNAPPY, ARCADE, FLOATY, MOON). The
   height stays the same; only the hang time changes.
 - **CPU DIVES**: how often CPU defenders launch flying tackles (FEWER, NORMAL, MORE, CONSTANT).
 - **GAME SPEED**: everyone's top speed and quickness (SLOWER, NORMAL, FASTER, TURBO).
 
-Online games use the defaults.
+Online games use the defaults (ARCADE, NORMAL, TURBO).
 
 ## Rules (arcade)
 
@@ -154,8 +156,8 @@ too; the recorded ones (pad hits, grunts, the line's clash at the snap, crowd ro
 `src/audio/sfx`) are ElevenLabs sound effects, mixed quietly under the play. `tools/voice/sfx.sh
 <downloaded.mp3> <name> <max seconds>` trims and levels a new one.
 
-Before every scrimmage play a deep robot voice reads the down and distance at the line, like the
-arcade original: "FIRST AND THIRTY", "THIRD AND TWELVE", "FOURTH AND GOAL". It is an ElevenLabs
+Before every scrimmage play, the moment both plays are picked, a deep robot voice reads the down
+and distance like the arcade original: "FIRST AND THIRTY", "THIRD AND TWELVE", "FOURTH AND GOAL". It is an ElevenLabs
 voice ("Gaming – Unreal Tonemanagement 2003") put through `tools/voice/robot.sh` (pitched down,
 tightened, a short metallic echo and hard compression), and each call is spliced from pieces in
 `src/audio/downs`: the down ("Third and"), then the distance ("twelve", "twenty" + "nine", "goal").
