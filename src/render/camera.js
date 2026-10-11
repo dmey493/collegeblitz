@@ -44,8 +44,8 @@ export class CameraDirector {
       const b = view.ball;
       if (!pl || pl.ph === 'lineup' || pl.ph === 'presnap' || s.ph !== 'play') {
         const kickoff = pl && pl.k === 'kickoff';
-        const back = kickoff ? 23 : 17.2;
-        const h = kickoff ? 15 : s.ph === 'playSelect' ? 13 : 11.6;
+        const back = kickoff ? 23 : 16.2;
+        const h = kickoff ? 15 : s.ph === 'playSelect' ? 13 : 11;
         const ahead = kickoff ? 18 : 8.5;
         pos = new THREE.Vector3(0, h, losZ - dir * back);
         look = new THREE.Vector3(0, 0.6, losZ + dir * ahead);
@@ -58,6 +58,12 @@ export class CameraDirector {
         let h = 11;
         let back = 15.5;
         let ahead = 7.5;
+        // once a runner is past the line the camera moves in tight on him
+        if (b.state === 'held' && dir * (b.z - losZ) > 0.5 && pl.k !== 'kickoff' && pl.k !== 'punt') {
+          h = 8.6;
+          back = 12.4;
+          ahead = 6.5;
+        }
         if (b.state === 'air' && view.flight) {
           const f = view.flight;
           const len = Math.hypot(f.tx - f.fx, f.tz - f.fz);

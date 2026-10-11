@@ -308,13 +308,18 @@ export class GameRenderer {
       }
       if (pl.ph === 'dead') this.deadT += dt;
       const flight = view.flight;
+      const bv = view.ball;
+      const pass = bv.state === 'air' && flight && flight.kind === 'pass';
       for (const p of view.players) {
         const m = this.model(p.id);
         m.root.visible = true;
         seen.add(p.id);
-        const carrying = view.ball.carrier === p.id && view.ball.state === 'held';
-        const reach = view.ball.state === 'air' && flight && flight.intended === p.id && Math.hypot(view.ball.x - p.x, view.ball.z - p.z) < 3.5;
-        m.update({ ...p, carrying, reach }, dt, ctxAnim);
+        const carrying = bv.carrier === p.id && bv.state === 'held';
+        const dBall = Math.hypot(bv.x - p.x, bv.z - p.z);
+        const reach = pass && flight.intended === p.id && dBall < 3.5;
+        // a pass coming down nearby: hands go to it
+        const ball = pass && dBall < 4.5 ? bv : null;
+        m.update({ ...p, carrying, reach, ball }, dt, ctxAnim);
       }
     }
     for (const [id, m] of this.models) if (!seen.has(id)) m.root.visible = false;

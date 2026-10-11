@@ -14,7 +14,16 @@ export const HASH_X = HALF_W - 20; // college hashes, 60 ft from each sideline
 
 export const HZ = 60;
 export const DT = 1 / HZ;
-export const GRAVITY = 24;
+export const GRAVITY = 24; // the ball
+// Players hang in the air longer than the ball does: arcade leaps and flying tackles.
+export const AIR_GRAVITY = 15;
+export const JUMP_VY = 5.9; // about 1.15 yd off the ground, 0.8 s in the air
+export const JUMP_APEX_T = JUMP_VY / AIR_GRAVITY;
+export const HURDLE_VY = 5.5;
+export const DIVE_VY = 3.3; // a layout or flying tackle: 0.44 s in the air, then a belly slide
+export const DIVE_AIR = (2 * DIVE_VY) / AIR_GRAVITY;
+export const DIVE_SLIDE = 0.3;
+export const HIT_GRAVITY = 20; // a runner blown up by a big hit
 
 export const TURBO_MULT = 1.25;
 export const TURBO_DRAIN = 0.42; // per second while burning

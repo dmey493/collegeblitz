@@ -1,7 +1,7 @@
 // AI for every player who isn't being steered by a human.
 // Each job sets p.ix/p.iz (desired direction scaled 0..1) and p.wantTurbo.
 
-import { HALF_W, GOAL, dirOf } from './constants.js';
+import { HALF_W, GOAL, dirOf, JUMP_VY, AIR_GRAVITY, DIVE_AIR } from './constants.js';
 import { clamp, lerp, len, dist } from './math.js';
 
 function seek(p, tx, tz, arrive = 0.01, frac = 1) {
@@ -77,12 +77,40 @@ function hawk(play, p) {
   return true;
 }
 
+const ballAt = (f, s) => ({ x: lerp(f.fx, f.tx, s), y: lerp(f.fy, f.ty, s) + 4 * f.apex * s * (1 - s), z: lerp(f.fz, f.tz, s) });
+
+// Go up for the ball: leap so the top of the jump meets it. Looks ahead for a leap (its
+// height sets its timing) that puts the ball in the hands at the top of it; receivers take
+// almost every such ball, defenders go up to knock it away. Decided once per throw.
+function leapFor(p, f) {
+  const G = AIR_GRAVITY;
+  for (let tau = JUMP_VY / G; tau >= 0.2; tau -= 0.025) {
+    const s = (f.t + tau) / f.T;
+    if (s > 1.2) continue;
+    const at = ballAt(f, s);
+    const H = 0.5 * G * tau * tau;
+    if (at.y < H + 1.25 || at.y > H + 2.65) continue;
+    if (len(at.x - (p.x + p.vx * tau), at.z - (p.z + p.vz * tau)) > 1.0) continue;
+    return { vy: G * tau, at };
+  }
+  return null;
+}
+
 function maybeJumpForBall(play, p) {
   const b = play.ball;
-  if (b.state !== 'air' || !b.f || b.f.kind !== 'pass' || p.y > 0 || p.actCd > 0) return;
-  const h = len(b.x - p.x, b.z - p.z);
-  const desc = b.f.t > b.f.T * 0.5;
-  if (desc && h < 1.6 && b.y > 2.2 && b.y < 3.4 && play.rng() < 0.35) play.doJump(p);
+  if (b.state !== 'air' || !b.f || b.f.kind !== 'pass' || b.f.resolved || p.y > 0 || p.actCd > 0 || !p.upright) return;
+  const f = b.f;
+  if (f.T - f.t > 0.75) return;
+  const leap = leapFor(p, f);
+  if (!leap) return;
+  if (p.leapFor !== f) {
+    p.leapFor = f;
+    const mine = f.intended === p;
+    const contested = play.players.some((q) => q.team !== p.team && q.upright && len(q.x - leap.at.x, q.z - leap.at.z) < 1.8);
+    const chance = mine ? (leap.at.y > 2.3 || contested ? 0.95 : 0.7) : contested ? 0.8 : 0.3;
+    p.leapGo = play.rng() < chance;
+  }
+  if (p.leapGo) play.doJump(p, leap.vy);
 }
 
 export function runAI(play, p, dt) {
@@ -289,6 +317,17 @@ function catchBall(play, p) {
   const frac = clamp(need / p.spd, 0.3, 1);
   seek(p, f.tx, f.tz, 0.25, d > 1.2 ? 1 : frac);
   turbo(p, need > p.spd * 0.95);
+  // a step short: lay out for it
+  if (p.y === 0 && p.actCd <= 0 && tLeft < DIVE_AIR + 0.05 && d > 1.3 && d < 4.2 && need > p.spd * 1.12 && ballAt(f, 1).y < 1.8) {
+    if (p.diveFor !== f) {
+      p.diveFor = f;
+      p.diveGo = play.rng() < 0.75;
+    }
+    if (p.diveGo) {
+      play.doDive(p, f.tx, f.tz, tLeft);
+      return;
+    }
+  }
   maybeJumpForBall(play, p);
 }
 
@@ -500,7 +539,11 @@ function rush(play, p) {
   if (play.liveT < 0.55) tx += -play.dir * (p.jd.lane || 0) * 1.8;
   const d = seek(p, tx, tz, 0.01);
   turbo(p, d < 7);
-  if (t.upright && d < 2.1 && d > 0.8 && p.actCd <= 0 && play.rng() < p.lvl.dive * 1.6 * (1 / 60)) play.doDive(p, t.x, t.z);
+  // a flying dive at the quarterback
+  if (t.upright && d < 2.8 && d > 0.9 && p.actCd <= 0 && play.rng() < p.lvl.dive * 1.6 * (1 / 60)) {
+    const T = DIVE_AIR * 0.8;
+    play.doDive(p, t.x + (t.vx || 0) * T, t.z + (t.vz || 0) * T);
+  }
 }
 
 function man(play, p) {
@@ -635,10 +678,16 @@ function pursue(play, p) {
   const d = seek(p, tx, tz, 0.01, p.lvl.pursuit);
   const dc = dist(p, c);
   turbo(p, dc < 13);
-  if (dc < 2.4 && dc > 0.9 && p.actCd <= 0 && p.upright && p.y === 0 && c.upright) {
-    const closing = ((c.x - p.x) * (p.vx - c.vx) + (c.z - p.z) * (p.vz - c.vz)) / dc;
-    const chance = p.lvl.dive * (closing < 2 ? 2.4 : 0.5) / 60;
-    if (play.rng() < chance) play.doDive(p, c.x + c.vx * 0.15, c.z + c.vz * 0.15);
+  // a flying tackle: launch at where the runner will be when we come down
+  if (dc < 5.5 && dc > 1.2 && p.actCd <= 0 && p.upright && p.y === 0 && c.upright) {
+    const T = DIVE_AIR * 0.85;
+    const lx = c.x + c.vx * T;
+    const lz = c.z + c.vz * T;
+    const dd = len(lx - p.x, lz - p.z);
+    const fx = p.speed > 1 ? p.vx / p.speed : Math.sin(p.face);
+    const fz = p.speed > 1 ? p.vz / p.speed : Math.cos(p.face);
+    const ahead = ((lx - p.x) * fx + (lz - p.z) * fz) / (dd || 1);
+    if (dd > 1.4 && dd < 3.8 && ahead > 0.75 && play.rng() < (p.lvl.dive * 2) / 60) play.doDive(p, lx, lz);
   }
   return d;
 }
