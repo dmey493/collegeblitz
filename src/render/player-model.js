@@ -2,8 +2,8 @@
 // barrel chest, slim legs, glossy helmet and cage) posed by a small pose system
 // driven by the sim state.
 import * as THREE from 'three';
-import { blobTexture, uniformTexture, uniformNormalMap, helmetTexture } from './textures.js';
-import { BODY, buildBones, buildPlayerGeometry } from './player-geo.js';
+import { blobTexture, uniformTexture, uniformNormalMap, helmetTexture, skinTexture, skinNormalMap } from './textures.js';
+import { BODY, buildBones, buildPlayerGeometry, rigSpec } from './player-geo.js';
 
 const SKINS = ['#f1c7a3', '#d9a476', '#b97c4f', '#8a5636', '#5d3a25', '#ebb995'];
 
@@ -16,7 +16,7 @@ function sharedAssets() {
     blob,
     blobTex: blobTexture(),
     geos: new Map(),
-    skin: SKINS.map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.55, vertexColors: true })),
+    skin: null,
     gear: null,
     visor: null,
     hidden: new THREE.MeshBasicMaterial({ visible: false }),
@@ -35,6 +35,13 @@ function geometryFor(body, team) {
 
 function materialsFor(team, num, skinIdx, visor, envMap, grime) {
   const S = sharedAssets();
+  if (!S.skin) {
+    // painted muscle and face detail on top of the tone, with a little sweat sheen
+    S.skin = SKINS.map((c) => new THREE.MeshStandardMaterial({
+      map: skinTexture(c), normalMap: skinNormalMap(), normalScale: new THREE.Vector2(1.1, 1.1),
+      vertexColors: true, roughness: 0.5, envMap, envMapIntensity: 0.35,
+    }));
+  }
   if (!S.gear) {
     S.gear = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.42, metalness: 0.12, envMap, envMapIntensity: 0.6 });
     S.visor = new THREE.MeshPhysicalMaterial({
@@ -69,7 +76,8 @@ export class PlayerModel {
     this.id = id;
     this.phase = Math.random() * 6;
     // bulkier players carry their arms further out from the body
-    this.abd = 0.16 + (B.w - 1) * 0.55;
+    this.abd = 0.13 + (B.w - 1) * 0.5;
+    this.hipY = rigSpec(B).pelvis[2];
     this.root = new THREE.Group();
 
     const skinIdx = (id * 7 + num) % SKINS.length;
@@ -103,7 +111,7 @@ export class PlayerModel {
     this.p = {
       tiltX: 0, tiltZ: 0, bodyY: 0, spin: 0, lean: 0, twist: 0, headX: 0,
       armFwd: [0, 0], armAbd: [0.15, 0.15], elbow: [0.3, 0.3],
-      legFwd: [0, 0], knee: [0.1, 0.1],
+      legFwd: [0, 0], knee: [0.1, 0.1], ankle: [0, 0], legAbd: [0.05, 0.05],
     };
     this.prevState = '';
   }
@@ -119,7 +127,7 @@ export class PlayerModel {
     const T = {
       tiltX: 0, tiltZ: 0, bodyY: 0, spin: 0, lean: 0.06, twist: 0, headX: 0,
       armFwd: [0.12, 0.12], armAbd: [0.16, 0.16], elbow: [0.35, 0.35],
-      legFwd: [0, 0], knee: [0.08, 0.08],
+      legFwd: [0, 0], knee: [0.08, 0.08], ankle: [0, 0], legAbd: [0.05, 0.05],
     };
     let rate = 16;
     const s = v.state;
@@ -143,7 +151,9 @@ export class PlayerModel {
       T.lean = 0.05 + Math.sin(ctx.time * 2 + this.id) * 0.015;
       T.knee = [0.12, 0.12];
       T.legFwd = [0.05, -0.02];
-      T.armAbd = [0.22, 0.22];
+      T.legAbd = [0.08, 0.08];
+      T.armAbd = [0.08, 0.08];
+      T.elbow = [0.28, 0.28];
     }
 
     switch (s) {
@@ -372,26 +382,30 @@ export class PlayerModel {
       P.elbow[i] = mix(P.elbow[i], T.elbow[i]);
       P.legFwd[i] = mix(P.legFwd[i], T.legFwd[i]);
       P.knee[i] = mix(P.knee[i], T.knee[i]);
+      P.ankle[i] = mix(P.ankle[i], T.ankle[i]);
+      P.legAbd[i] = mix(P.legAbd[i], T.legAbd[i]);
     }
     this.prevState = s;
 
     // apply to the skeleton
     const b = this.bones;
     r.rotation.y = v.face + P.spin;
-    b.pelvis.position.y = this.B.h + P.bodyY + v.y;
+    b.pelvis.position.y = this.hipY + P.bodyY + v.y;
     b.pelvis.rotation.set(P.tiltX, 0, P.tiltZ);
     // the lean bends through the lower back and the chest; the head stays up
     b.spine.rotation.set(P.lean * 0.42, P.twist * 0.45, 0);
     b.chest.rotation.set(P.lean * 0.58, P.twist * 0.55, 0);
     b.head.rotation.set(P.headX - P.lean * 0.55, 0, 0);
     const arms = [[b.shR, b.elR], [b.shL, b.elL]];
-    const legs = [[b.hipR, b.kneeR], [b.hipL, b.kneeL]];
+    const legs = [[b.hipR, b.kneeR, b.footR], [b.hipL, b.kneeL, b.footL]];
     for (let i = 0; i < 2; i++) {
       const side = i === 0 ? -1 : 1;
       arms[i][0].rotation.set(-P.armFwd[i], 0, side * (P.armAbd[i] + this.abd));
       arms[i][1].rotation.x = -P.elbow[i];
-      legs[i][0].rotation.x = -P.legFwd[i];
+      legs[i][0].rotation.set(-P.legFwd[i], 0, side * P.legAbd[i]);
       legs[i][1].rotation.x = P.knee[i];
+      // the foot stays roughly flat to the body unless the pose points it
+      legs[i][2].rotation.x = Math.min(0.5, Math.max(-0.7, P.legFwd[i] - P.knee[i])) * 0.85 + P.ankle[i];
     }
     // shadow blob shrinks when airborne
     const air = Math.max(0, v.y);
