@@ -1,7 +1,12 @@
 // The playing surface: mowed stripes, college markings, end zones, pylons, goal posts.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { HALF_W, GOAL, END, POST_HALF, CROSSBAR } from '../sim/constants.js';
+import { HALF_W, GOAL, END, POST_HALF, CROSSBAR as GAME_CROSSBAR } from '../sim/constants.js';
+import { PLAYER_SCALE } from './player-model.js';
+
+// heights are drawn at the players' scale (see PLAYER_SCALE), so kicks clear the bar as they do
+// in the game
+const CROSSBAR = GAME_CROSSBAR * PLAYER_SCALE;
 import { grassTexture, numberTexture, endZoneTexture, midfieldTexture, turfWearTexture } from './textures.js';
 
 const LINE_Y = 0.012;
@@ -194,7 +199,7 @@ function goalPost(s, team) {
   bar.rotation.z = Math.PI / 2;
   bar.position.set(0, CROSSBAR, s * END);
   g.add(bar);
-  const up = 10;
+  const up = 10 * PLAYER_SCALE;
   const flagMat = new THREE.MeshBasicMaterial({ color: '#ff3b1f', side: THREE.DoubleSide, transparent: true });
   for (const x of [-POST_HALF, POST_HALF]) {
     const u = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.8, r * 0.8, up, 10), yellow);

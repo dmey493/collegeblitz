@@ -1,6 +1,7 @@
 // Blitz-style camera: always behind the offense, high and tight, pulling back on deep balls.
 import * as THREE from 'three';
 import { HALF_W, VIEW_TURN } from '../sim/constants.js';
+import { PLAYER_SCALE } from './player-model.js';
 
 const damp = (k, dt) => 1 - Math.exp(-k * dt);
 
@@ -109,7 +110,8 @@ export class CameraDirector {
           kp = 2.2;
           kl = 4;
         } else {
-          const lift = b.state === 'air' ? Math.min(b.y, 22) * (b.kind === 'kick' || b.kind === 'fg' ? 0.55 : 0.3) : 0;
+          // (the ball is drawn PLAYER_SCALE higher than the game's own heights)
+          const lift = b.state === 'air' ? Math.min(b.y * PLAYER_SCALE, 22) * (b.kind === 'kick' || b.kind === 'fg' ? 0.55 : 0.3) : 0;
           pos = new THREE.Vector3(THREE.MathUtils.clamp(fx * 0.72, -15, 15), h + lift * 0.4, fz - dir * back);
           look = new THREE.Vector3(THREE.MathUtils.clamp(fx * 0.85, -HALF_W, HALF_W), 1.0 + lift, fz + dir * ahead);
           kp = 4.2;

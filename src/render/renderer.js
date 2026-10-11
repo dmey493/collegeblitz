@@ -441,7 +441,8 @@ export class GameRenderer {
       B.rotation.set(0, m.root.rotation.y, 0);
       sp.rotation.set(Math.PI / 2 - 0.5, 0, 0);
     } else {
-      B.position.set(b.x, Math.max(0.13, b.y), b.z);
+      // drawn at the players' scale, so a pass arrives where the hands are
+      B.position.set(b.x, Math.max(0.16, b.y * PLAYER_SCALE), b.z);
       const vel = tmpV.copy(B.position).sub(prev);
       if (b.state === 'air' && vel.lengthSq() > 1e-6) {
         const yaw = Math.atan2(vel.x, vel.z);
@@ -506,7 +507,7 @@ export class GameRenderer {
         const p = view.byId.get(id);
         if (p) {
           g.position.set(p.x, 0, p.z);
-          g.userData.tag.position.y = 2.55 * PLAYER_SCALE + p.y;
+          g.userData.tag.position.y = (2.55 + p.y) * PLAYER_SCALE;
         } else g.visible = false;
       }
     }
@@ -522,7 +523,7 @@ export class GameRenderer {
       if (!p) continue;
       // a lone receiver answers to every key; label him with the middle one
       M.setIcon(n, single ? icons.labels[1] : icons.labels[n], icons.round);
-      sp.position.set(p.x, 3.05 * PLAYER_SCALE + p.y + (sp.userData.bob || 0), p.z);
+      sp.position.set(p.x, (3.05 + p.y) * PLAYER_SCALE + (sp.userData.bob || 0), p.z);
     }
     const tg = pl ? pl.tg.find((x, t) => x >= 0 && view.local && view.local[t]) : undefined;
     if (tg !== undefined && tg >= 0 && view.byId.get(tg)) {

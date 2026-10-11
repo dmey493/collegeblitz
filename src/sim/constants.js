@@ -28,8 +28,8 @@ export const HIT_GRAVITY = 20; // a runner blown up by a big hit
 // this grew, so a downed player is out of the play as long as before.
 export const GETUP_TIME = 0.85;
 // A body that comes down on a man already on the turf lies on top of him, this much higher
-// (about the thickness of the 1.45x players lying down), up to two deep.
-export const PILE_Y = 0.4;
+// (about the thickness of a player lying down), up to two deep.
+export const PILE_Y = 0.28;
 // No flags, as in the arcade original: while a pass is in the air a defender may flatten the
 // receiver (a dive, or a turbo hit). CPU defenders wait until this close to the catch to do it.
 export const CPU_HIT_TIME = 0.9;

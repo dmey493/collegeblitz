@@ -157,7 +157,9 @@ const basePose = () => ({
 });
 
 // Players are drawn larger than life (the arcade look): every model is scaled up from its
-// real-world proportions. The game itself (positions, collisions, jump heights) is unchanged.
+// real-world proportions, and so is every height the game hands the renderer (how far off the
+// ground a player is, the ball in flight, the goalposts), so a leap still takes the hands up to
+// the ball at full stretch, as designed. The game itself (positions, collisions) is unchanged.
 export const PLAYER_SCALE = 1.45;
 
 export class PlayerModel {
@@ -690,7 +692,7 @@ export class PlayerModel {
     r.rotation.y = v.face + P.spin;
     // the sim's height off the ground is in world units: undo the model scale for it, so leaps
     // and dives keep their real height and the hands still meet the ball
-    b.pelvis.position.set(P.bodyX, this.hipY + P.bodyY + v.y / PLAYER_SCALE, P.bodyZ);
+    b.pelvis.position.set(P.bodyX, this.hipY + P.bodyY + v.y, P.bodyZ); // the root scales v.y with the body
     b.pelvis.rotation.set(P.tiltX, P.hipTwist, P.tiltZ);
     // the lean bends through the lower back and the chest; the head stays up
     b.spine.rotation.set(P.lean * 0.42, (P.twist - P.hipTwist) * 0.45, P.bend * 0.5);
@@ -909,12 +911,12 @@ export class PlayerModel {
     }
   }
 
-  // Point both arms (or just arm `only`) at a spot in the world (the ball): the hands come
-  // together on it.
+  // Point both arms (or just arm `only`) at a spot in the game (the ball): the hands come
+  // together on it. Game heights are drawn PLAYER_SCALE higher, like the players.
   aimArms(T, ball, elbow, only = -1) {
     const chest = this.bones.chest;
     chest.updateWorldMatrix(true, false);
-    tmpA.set(ball.x, ball.y, ball.z);
+    tmpA.set(ball.x, ball.y * PLAYER_SCALE, ball.z);
     chest.worldToLocal(tmpA);
     for (let i = 0; i < 2; i++) {
       if (only >= 0 && i !== only) continue;

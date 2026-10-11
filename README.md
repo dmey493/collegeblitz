@@ -150,11 +150,11 @@ test/               headless engine, controls and networking tests (npm test)
 Every texture (uniforms, helmets, field paint, crowd, state outlines), every player model and
 every sound effect is generated at runtime, so there are no art or sound-effect assets to license.
 
-The announcer is an ElevenLabs voice, "World Wrestling Announcer". Each call in
-`src/audio/announcer.js` can have recorded takes in `src/audio/voice/` named
-`<call>-<line>-<take>.mp3` (`td-0-0.mp3` is the first take of "Touchdown!"); the build inlines
-them and a random take plays when that call fires. A line with no recording yet is read out by
-the browser's text-to-speech. `tools/voice/prep.sh <downloaded.mp3> <name>` trims the dead air and
+The announcer is an ElevenLabs voice, "World Wrestling Announcer": every call in
+`src/audio/announcer.js` is recorded, two takes a line, in `src/audio/voice/` as
+`<call>-<line>-<take>.mp3` (`td-0-0.mp3` is the first take of "Touchdown!"). The build inlines
+them and a random take plays when that call fires. A line added later without a recording is read
+out by the browser's text-to-speech until it gets one. `tools/voice/prep.sh <downloaded.mp3> <name>` trims the dead air and
 levels a new take before it goes in.
 
 The running animation is driven by motion capture: gait cycles measured from the Carnegie Mellon
