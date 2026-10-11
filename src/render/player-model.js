@@ -156,6 +156,10 @@ const basePose = () => ({
   legFwd: [0, 0], knee: [0.08, 0.08], ankle: [0, 0], legAbd: [0.06, 0.06],
 });
 
+// Players are drawn larger than life (the arcade look): every model is scaled up from its
+// real-world proportions. The game itself (positions, collisions, jump heights) is unchanged.
+export const PLAYER_SCALE = 1.3;
+
 export class PlayerModel {
   constructor({ team, num, body, slot, id, envMap }) {
     const S = sharedAssets();
@@ -170,6 +174,7 @@ export class PlayerModel {
     // hip to ankle, to scale the captured hip bounce (measured in leg lengths)
     this.legLen = 0.945 * B.h;
     this.root = new THREE.Group();
+    this.root.scale.setScalar(PLAYER_SCALE);
 
     const skinIdx = (id * 7 + num) % SKINS.length;
     const visor = ((id * 31 + num * 7) % 10) < (body === 'big' ? 1 : 4);
@@ -682,7 +687,9 @@ export class PlayerModel {
     // apply to the skeleton
     const b = this.bones;
     r.rotation.y = v.face + P.spin;
-    b.pelvis.position.set(P.bodyX, this.hipY + P.bodyY + v.y, P.bodyZ);
+    // the sim's height off the ground is in world units: undo the model scale for it, so leaps
+    // and dives keep their real height and the hands still meet the ball
+    b.pelvis.position.set(P.bodyX, this.hipY + P.bodyY + v.y / PLAYER_SCALE, P.bodyZ);
     b.pelvis.rotation.set(P.tiltX, P.hipTwist, P.tiltZ);
     // the lean bends through the lower back and the chest; the head stays up
     b.spine.rotation.set(P.lean * 0.42, (P.twist - P.hipTwist) * 0.45, P.bend * 0.5);

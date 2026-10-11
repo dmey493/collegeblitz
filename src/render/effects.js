@@ -2,6 +2,10 @@
 import * as THREE from 'three';
 import { HALF_W } from '../sim/constants.js';
 import { glowTexture, labelTexture, iconTexture, ICON_COLORS } from './textures.js';
+import { PLAYER_SCALE } from './player-model.js';
+
+// markers hang this high over a player's head (players are drawn larger than life)
+const OVERHEAD = PLAYER_SCALE;
 
 // ------------------------------------------------------------------ ball
 export function makeBall() {
@@ -291,7 +295,7 @@ export class Markers {
       g.add(ring);
       const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTexture(i === 0 ? '1P' : '2P', i === 0 ? '#ffe04a' : '#4ae0ff'), depthTest: false, transparent: true }));
       tag.scale.set(1.0, 0.5, 1);
-      tag.position.y = 2.55;
+      tag.position.y = 2.55 * OVERHEAD;
       tag.renderOrder = 20;
       g.add(tag);
       g.visible = false;
@@ -303,7 +307,7 @@ export class Markers {
     const tg = new THREE.Group();
     const cone = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.5, 3), new THREE.MeshBasicMaterial({ color: '#ff3b3b', depthTest: false, transparent: true }));
     cone.rotation.x = Math.PI;
-    cone.position.y = 3.0;
+    cone.position.y = 3.0 * OVERHEAD;
     cone.renderOrder = 21;
     tg.add(cone);
     const tring = new THREE.Mesh(new THREE.RingGeometry(0.75, 0.95, 3, 1), new THREE.MeshBasicMaterial({ color: '#ff3b3b', transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide }));
@@ -352,7 +356,7 @@ export class Markers {
     const pulse = 1 + Math.sin(this.t * 7) * 0.08;
     for (const c of this.ctrl) c.userData.ring.scale.setScalar(pulse);
     this.target.userData.cone.rotation.y += dt * 4;
-    this.target.userData.cone.position.y = 2.95 + Math.sin(this.t * 6) * 0.12;
+    this.target.userData.cone.position.y = 2.95 * OVERHEAD + Math.sin(this.t * 6) * 0.12;
     for (let n = 0; n < 3; n++) this.icons[n].userData.bob = Math.sin(this.t * 5 + n * 1.3) * 0.1;
   }
 }

@@ -117,7 +117,9 @@ steering, the human QB takes his drop automatically.
   long legs and a small helmet sunk between wide, flat-topped shoulder pads (part of the torso,
   the jersey stretched over them), a deep chest that V-tapers to the belt, big arms with huge
   forearms and painted muscle, gloves with fingers, tight pants over thigh and knee pads,
-  ribbed socks over taped ankles, high-top studded cleats and a face inside the helmet. One
+  ribbed socks over taped ankles, high-top studded cleats and a face inside the helmet, all drawn
+  1.3x larger than life (PLAYER_SCALE; the game's positions and jump heights are unchanged) and
+  framed by a low camera that stays close to the action so they fill the screen. One
   skinned mesh each (17 bones, ~14k triangles). Uniform texture atlas per player (block
   numbers with an outline and drop shadow, mesh knit, sleeve stripes and ribbed cuffs, belt,
   pants stripes, laces); clear-coated helmets with stripe and state decal, cage masks for

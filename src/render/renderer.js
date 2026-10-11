@@ -7,7 +7,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { buildField } from './field.js';
 import { Stadium } from './stadium.js';
-import { PlayerModel } from './player-model.js';
+import { PlayerModel, PLAYER_SCALE } from './player-model.js';
 import { Effects, Markers, makeBall } from './effects.js';
 import { CameraDirector } from './camera.js';
 import { bodyOfSlot } from '../sim/player.js';
@@ -123,6 +123,8 @@ export class GameRenderer {
 
     this.effects = new Effects(this.scene);
     this.ball = makeBall();
+    // in proportion with the oversized players' hands
+    this.ball.scale.setScalar(1 + (PLAYER_SCALE - 1) * 0.6);
     this.scene.add(this.ball);
     this.models = new Map();
     this.world = null;
@@ -503,7 +505,7 @@ export class GameRenderer {
         const p = view.byId.get(id);
         if (p) {
           g.position.set(p.x, 0, p.z);
-          g.userData.tag.position.y = 2.55 + p.y;
+          g.userData.tag.position.y = 2.55 * PLAYER_SCALE + p.y;
         } else g.visible = false;
       }
     }
@@ -519,7 +521,7 @@ export class GameRenderer {
       if (!p) continue;
       // a lone receiver answers to every key; label him with the middle one
       M.setIcon(n, single ? icons.labels[1] : icons.labels[n], icons.round);
-      sp.position.set(p.x, 3.05 + p.y + (sp.userData.bob || 0), p.z);
+      sp.position.set(p.x, 3.05 * PLAYER_SCALE + p.y + (sp.userData.bob || 0), p.z);
     }
     const tg = pl ? pl.tg.find((x, t) => x >= 0 && view.local && view.local[t]) : undefined;
     if (tg !== undefined && tg >= 0 && view.byId.get(tg)) {

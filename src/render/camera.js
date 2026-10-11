@@ -46,26 +46,28 @@ export class CameraDirector {
       const b = view.ball;
       if (!pl || pl.ph === 'lineup' || pl.ph === 'presnap' || s.ph !== 'play') {
         const kickoff = pl && pl.k === 'kickoff';
-        const back = kickoff ? 23 : 16.2;
-        const h = kickoff ? 15 : s.ph === 'playSelect' ? 13 : 11;
+        // a lower angle than a TV camera: the players stand up tall on screen
+        const back = kickoff ? 23 : 17.4;
+        const h = kickoff ? 15 : s.ph === 'playSelect' ? 13 : 8.6;
         const ahead = kickoff ? 18 : 8.5;
         pos = new THREE.Vector3(0, h, losZ - dir * back);
-        look = new THREE.Vector3(0, 0.6, losZ + dir * ahead);
+        look = new THREE.Vector3(0, kickoff ? 0.6 : 1.2, losZ + dir * ahead);
         kp = 3.2;
         this.tdAngle = null;
       } else {
         // follow the ball
         let fx = b.x;
         let fz = b.z;
-        let h = 11;
-        let back = 15.5;
-        let ahead = 7.5;
+        // close in on the action (the players are drawn larger than life)
+        let h = 7.6;
+        let back = 13.2;
+        let ahead = 6.6;
         // once a runner is past the line the camera moves in tight on him
         const returning = pl.ps !== undefined && pl.ps !== pl.off;
         if (b.state === 'held' && (returning || (dir * (b.z - losZ) > 0.5 && pl.k !== 'kickoff' && pl.k !== 'punt'))) {
-          h = 8;
-          back = 11.2;
-          ahead = 6.5;
+          h = 6.4;
+          back = 10.6;
+          ahead = 6;
         }
         if (b.state === 'air' && view.flight) {
           const f = view.flight;
@@ -75,9 +77,9 @@ export class CameraDirector {
             const prog = Math.min(1, Math.hypot(b.x - f.fx, b.z - f.fz) / len);
             const e = Math.min(1, len / 40) * (1 - THREE.MathUtils.smoothstep(prog, 0.3, 0.8));
             const tight = THREE.MathUtils.smoothstep(prog, 0.3, 0.85);
-            h = THREE.MathUtils.lerp(h, 7.2, tight) + e * 5;
-            back = THREE.MathUtils.lerp(back, 9.8, tight) + e * 6;
-            ahead = THREE.MathUtils.lerp(ahead, 5.5, tight) + e * 5;
+            h = THREE.MathUtils.lerp(h, 6.8, tight) + e * 5;
+            back = THREE.MathUtils.lerp(back, 9.2, tight) + e * 6;
+            ahead = THREE.MathUtils.lerp(ahead, 5.2, tight) + e * 5;
             fx = THREE.MathUtils.lerp(b.x, f.tx, 0.6 * tight);
             fz = THREE.MathUtils.lerp(b.z, f.tz, 0.6 * tight);
           } else {
@@ -107,7 +109,7 @@ export class CameraDirector {
         } else {
           const lift = b.state === 'air' ? Math.min(b.y, 22) * (b.kind === 'kick' || b.kind === 'fg' ? 0.55 : 0.3) : 0;
           pos = new THREE.Vector3(THREE.MathUtils.clamp(fx * 0.72, -15, 15), h + lift * 0.4, fz - dir * back);
-          look = new THREE.Vector3(THREE.MathUtils.clamp(fx * 0.85, -HALF_W, HALF_W), 0.6 + lift, fz + dir * ahead);
+          look = new THREE.Vector3(THREE.MathUtils.clamp(fx * 0.85, -HALF_W, HALF_W), 1.0 + lift, fz + dir * ahead);
           kp = 4.2;
           kl = 7;
         }
