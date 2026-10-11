@@ -751,8 +751,10 @@ export class Play {
       const l = len(wx, wz);
       const mag = Math.min(1, l);
       const b = this.ball;
-      // let the receiver track the ball himself if the player isn't steering
-      if (b.state === 'air' && b.f && b.f.kind === 'pass' && b.f.intended === p && mag < 0.2) {
+      // while the pass is in the air the receiver runs to it himself (steering him only made
+      // catches harder): the player's jump and dive buttons still act on him, so a well-timed
+      // leap or layout is still theirs. The stick takes over once he has the ball.
+      if (b.state === 'air' && b.f && b.f.kind === 'pass' && b.f.intended === p) {
         this.humanActions(team, p, inp);
         continue;
       }

@@ -101,8 +101,9 @@ layout under **SETTINGS → CONTROLS** (or on the vs-CPU setup screen).
   the keys. Press a receiver's key to throw to him. Hold turbo for a bullet. Set **PASSING → AIM +
   PASS** for the classic style: steer toward a receiver to highlight him, then press Pass.
 - **Ball carrier:** Spin to juke, Pass to stiff-arm, Jump to hurdle.
-- **Receiver with the ball in the air:** Jump to go up for it (the leap is sized to meet the ball),
-  Spin to lay out for it (a diving catch is down where it lands).
+- **Receiver with the ball in the air:** he runs to the ball himself (the stick doesn't steer him
+  until he has it). Jump to go up for it (the leap is sized to meet the ball), Spin to lay out for
+  it (a diving catch is down where it lands).
 - **Defense:** Pass switches to the defender nearest the ball, Jump to leap and swat, Spin for a
   flying tackle: it homes in on a runner ahead of you from up to about five yards. Miss and you
   are on the ground for a second and a half.

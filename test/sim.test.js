@@ -187,6 +187,34 @@ test('receiver icons go left to right and each key throws to its own receiver', 
   }
 });
 
+test('the receiver runs to the pass himself: the stick does not steer him until he has the ball', () => {
+  let rec = null;
+  let f = null;
+  let steered = 0;
+  let closest = Infinity;
+  const { play } = humanPassPlay('curls', 'safe', (p, press, inp) => {
+    if (p.phase === 'presnap' && p.presnapT > 0.3 && !p.snapped) {
+      p.snapped = true;
+      press('s');
+    }
+    if (p.phase === 'live' && p.liveT > 1.2 && !rec) {
+      rec = p.byId.get(p.icons[1]);
+      press('c1');
+    }
+    const b = p.ball;
+    if (rec && b.state === 'air' && b.f && b.f.kind === 'pass') {
+      f = b.f;
+      inp.mx = 1; // yank the stick sideways the whole time the ball is up
+      if (p.ctrl[0] === rec && rec.humanDriven) steered++;
+      closest = Math.min(closest, Math.hypot(rec.x - f.tx, rec.z - f.tz));
+    } else inp.mx = 0;
+  });
+  assert.ok(rec && f, 'a pass was thrown');
+  assert.equal(play.ctrl[0], rec, 'the jump and dive buttons act on the receiver');
+  assert.equal(steered, 0, 'the stick never drove the receiver while the ball was in the air');
+  assert.ok(closest < 1.5, `the receiver got to the ball (closest ${closest.toFixed(2)})`);
+});
+
 test('a single press snaps the ball and never also throws it', () => {
   const { events } = humanPassPlay('curls', 'safe', (p, press) => {
     if (p.phase === 'presnap' && p.presnapT > 0.3 && !p.snapped) {

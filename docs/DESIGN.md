@@ -58,6 +58,9 @@ answers to any key. The classic *aim + pass* style (steer toward a receiver, pre
 setting. A press made while the snap is still in the air is held until the QB has the ball.
 
 Context moves: ball carrier **Spin = spin move**, **Pass = stiff-arm**, **Jump = hurdle**.
+After a throw your control moves to the intended receiver, but while the ball is in the air he
+runs to it on his own: the stick only takes over once he has caught it. **Jump** and **Spin**
+still act on him, so a well-timed leap or layout is yours.
 Receiver: **Jump** to go up for the ball (with a pass in the air the leap is sized so its top
 meets the ball), **Spin = diving catch** (paced to meet the ball; down where you land).
 Defender: **Spin = flying tackle** (homes in on a runner ahead of you, up to ~5 yards out),
